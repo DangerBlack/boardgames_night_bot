@@ -12,7 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fzerorubigd/gobgg"
+	"github.com/DangerBlack/gobgg"
+
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"gopkg.in/telebot.v3"
