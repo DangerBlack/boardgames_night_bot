@@ -27,6 +27,7 @@ To install the Boardgame Night Bot, follow these steps:
     BOT_NAME=name_of_your_bot 
     PORT=8080
     DB_PATH=./archive 
+    BGG_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ```
 
 > [!Note]
@@ -70,6 +71,7 @@ services:
       - BOT_NAME=name_of_your_bot 
       - PORT=8080
       - DB_PATH=/archive
+      - BGG_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ports:
       - "8080:8080"
     volumes:
