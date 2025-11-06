@@ -110,7 +110,7 @@ func main() {
 	}
 
 	baseUrl := os.Getenv("BASE_URL")
-	portString := os.Getenv("PORT")
+	portString := StringOrDefault(os.Getenv("PORT"), "8080")
 	port, err := strconv.Atoi(portString)
 	if err != nil {
 		log.Fatal("the PORT is not set in .env file or is not a valid number")
