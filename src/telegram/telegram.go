@@ -12,7 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fzerorubigd/gobgg"
+	"github.com/DangerBlack/gobgg"
+
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"gopkg.in/telebot.v3"

@@ -18,8 +18,9 @@ import (
 
 	"time"
 
+	"github.com/DangerBlack/gobgg"
+
 	"github.com/BurntSushi/toml"
-	"github.com/fzerorubigd/gobgg"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -103,8 +104,13 @@ func main() {
 	healthCheckUrl := os.Getenv("HEALTH_CHECK_URL")
 	InitHealthCheck(healthCheckUrl)
 
+	bggToken := os.Getenv("BGG_TOKEN")
+	if bggToken == "" {
+		log.Fatal("the BGG_TOKEN is not set in .env file")
+	}
+
 	baseUrl := os.Getenv("BASE_URL")
-	portString := os.Getenv("PORT")
+	portString := StringOrDefault(os.Getenv("PORT"), "8080")
 	port, err := strconv.Atoi(portString)
 	if err != nil {
 		log.Fatal("the PORT is not set in .env file or is not a valid number")
@@ -135,7 +141,10 @@ func main() {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	bgg := gobgg.NewBGGClient(gobgg.SetClient(client))
+	bgg := gobgg.NewBGGClient(
+		gobgg.SetClient(client),
+		gobgg.SetBearerToken(bggToken),
+	)
 
 	telegram := telegram.Telegram{
 		Bot:            bot,
