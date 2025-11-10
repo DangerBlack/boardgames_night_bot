@@ -423,11 +423,6 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		return
 	}
 
-	if bg.MaxPlayers == nil {
-		defaultMax := 5
-		bg.MaxPlayers = &defaultMax
-	}
-
 	bgCtx := context.Background()
 
 	var bgID *int64
@@ -447,7 +442,9 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 			log.Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
-			bg.MaxPlayers = bgMaxPlayers
+			if bg.MaxPlayers == nil {
+				bg.MaxPlayers = bgMaxPlayers
+			}
 		}
 	} else {
 		log.Printf("Searching for game %s", bg.Name)
@@ -482,7 +479,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 
 			if len(things) > 0 {
 				log.Printf("Game details of %s found", bg.Name)
-				if things[0].MaxPlayers > 0 {
+				if things[0].MaxPlayers > 0 && bg.MaxPlayers == nil {
 					bg.MaxPlayers = &things[0].MaxPlayers
 				}
 
@@ -496,6 +493,11 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 				}
 			}
 		}
+	}
+
+	if bg.MaxPlayers == nil {
+		defaultMax := 5
+		bg.MaxPlayers = &defaultMax
 	}
 
 	log.Printf("Inserting %s in the db", bg.Name)
