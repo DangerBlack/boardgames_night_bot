@@ -44,6 +44,8 @@ type BoardGame struct {
 	BggName      *string       `json:"bgg_name"`
 	BggUrl       *string       `json:"bgg_url"`
 	BggImageUrl  *string       `json:"bgg_image_url"`
+	InitiatorName  *string       `json:"initiator_name"`
+	
 }
 
 type AddGameRequest struct {
@@ -85,7 +87,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, baseUrl string, botName strin
 
 	link := ""
 	if bg.BggUrl != nil && bg.BggName != nil && *bg.BggUrl != "" && *bg.BggName != "" {
-		link = fmt.Sprintf(" - <a href='%s'>%s</a>\n", *bg.BggUrl, *bg.BggName)
+		link = fmt.Sprintf(" %s -- <a href='%s'>%s</a>\n", *bg.InitiatorName, *bg.BggUrl, *bg.BggName)
 	}
 
 	name := bg.Name
@@ -132,7 +134,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, baseUrl string, botName stri
 
 	msg := "📆 <b>" + e.Name + "</b>\n\n"
 	for _, bg := range e.BoardGames {
-		bgMsg, btn, err := e.FormatBG(localizer, baseUrl, botName, bg)
+		bgMsg, btn, err := e.FormatBG(localizer, baseUrl, botName)
 		if err != nil {
 			log.Printf("Failed to format board game: %v", err)
 			continue

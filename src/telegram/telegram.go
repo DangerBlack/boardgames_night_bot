@@ -125,7 +125,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	log.Printf("Event created with id: %s", eventID)
 
 	if strings.Contains(eventName, "👥") {
-		if _, err = t.DB.InsertBoardGame(eventID, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
+		if _, err = t.DB.InsertBoardGame(eventID, models.PLAYER_COUNTER, -1, nil, nil, nil, nil, nil); err != nil {
 			log.Println("failed to add game:", err)
 			failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 			return c.Reply(failedT)
@@ -244,7 +244,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		}
 	}
 
-	if boardGameID, err = t.DB.InsertBoardGame(event.ID, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl); err != nil {
+	if boardGameID, err = t.DB.InsertBoardGame(event.ID, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl, event.user_name); err != nil {
 		log.Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
