@@ -574,7 +574,7 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 	log.Printf("Setting location to %s in chat %d", location, chatID)
 
 	if err := t.DB.InsertChat(chatID, nil, &location); err != nil {
-		log.Println("failed to set language:", err)
+		log.Println("failed to set location:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLocation"}}))
 	}
 
