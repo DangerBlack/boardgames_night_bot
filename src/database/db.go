@@ -55,8 +55,8 @@ func (d *Database) CreateTables() {
 			user_name TEXT,
 			name TEXT,
 			message_id INTEGER,
-    		location TEXT,
-    		starts_at TIMESTAMP,
+			location TEXT,
+			starts_at TIMESTAMP,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 		`CREATE TABLE IF NOT EXISTS boardgames (
@@ -131,7 +131,7 @@ func (d *Database) InsertEvent(chatID, userID int64, userName, name string, mess
 		COALESCE(
 			@location,
 			(SELECT default_location FROM chats WHERE chat_id = @chat_id)
-    	), 
+		), 
 		@starts_at
 	) 
 	RETURNING id;`
