@@ -162,6 +162,8 @@ func (c *Controller) Event(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "event", gin.H{
 		"Id":             event.ID,
 		"Title":          event.Name,
+		"StartsAt":       event.FormatStartAt(),
+		"Location":       event.Location,
 		"Games":          event.BoardGames,
 		"UpdatedAt":      timeT,
 		"NoParticipants": localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
@@ -214,6 +216,8 @@ func (c *Controller) Game(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "game_info", gin.H{
 		"Id":                      event.ID,
 		"Title":                   event.Name,
+		"StartsAt":                event.FormatStartAt(),
+		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
@@ -332,6 +336,8 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "game_info", gin.H{
 		"Id":                      event.ID,
 		"Title":                   event.Name,
+		"StartsAt":                event.FormatStartAt(),
+		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
@@ -562,6 +568,8 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "game_info", gin.H{
 		"Id":                      event.ID,
 		"Title":                   event.Name,
+		"StartsAt":                event.FormatStartAt(),
+		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),

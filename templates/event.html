@@ -144,6 +144,12 @@
 </head>
 <body>
     <h1>📆 {{ .Title }}</h1>
+    {{ if .StartsAt }}
+    <p><b>⏰ {{ .StartsAt }}</b></p>
+    {{ end }}
+    {{ if .Location }}
+    <p><b>📍{{ .Location }}</b></p>
+    {{ end }}
     
     {{ $join := .Join }}
     {{ $players := .Players }}
