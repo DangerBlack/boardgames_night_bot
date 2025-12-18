@@ -57,6 +57,43 @@ func (c *Controller) InjectRoute() {
 	c.Router.DELETE("/events/:event_id/games/:game_id", c.DeleteGame)
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
+	c.Router.GET("/bgg/search", c.BggSearch)
+}
+
+// BggSearch handles GET /bgg/search?name= for autocomplete
+func (c *Controller) BggSearch(ctx *gin.Context) {
+	name := ctx.Query("name")
+	if name == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Missing name parameter"})
+		return
+	}
+	bgCtx := context.Background()
+	results, err := c.BGG.Search(bgCtx, name)
+	if err != nil {
+		log.Printf("BGG search error: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search BGG"})
+		return
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].ID < results[j].ID
+	})
+	// Return top 10 results with name and bgg_url
+	var out []map[string]string
+	for i, r := range results {
+		if i >= 10 {
+			break
+		}
+		url := ""
+		if r.ID > 0 {
+			url = fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", r.ID)
+		}
+		out = append(out, map[string]string{
+			"name":    r.Name,
+			"bgg_url": url,
+		})
+	}
+	ctx.JSON(http.StatusOK, out)
 }
 
 func (c *Controller) Index(ctx *gin.Context) {

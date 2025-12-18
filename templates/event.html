@@ -43,6 +43,53 @@
             border-radius: 5px; 
             font-size: 1em;
         }
+        /* Autocomplete styles */
+        .autocomplete-items {
+            position: absolute;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-top: none;
+            max-height: 220px;
+            overflow-y: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            border-radius: 0 0 8px 8px;
+            z-index: 100;
+        }
+        .autocomplete-items div {
+            padding: 10px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        .autocomplete-items div:last-child {
+            border-bottom: none;
+        }
+        .autocomplete-items div:hover, .autocomplete-items .selected {
+            background: #f0f8ff;
+        }
+        .autocomplete-loading {
+            text-align: left;
+            padding: 10px 16px;
+            color: #888;
+            font-style: italic;
+        }
+        .autocomplete-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #eee;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         .add-game button {
             width: 95%; 
             padding: 10px; 
@@ -148,9 +195,10 @@
         <p>{{ .Welcome }} <span id="username"></span></p>
         <div class="add-game">
             <h3>{{ .AddNewGame }}</h3>
-            <form action="{{ .Id }}/add-game" method="post">
-                <input type="text" name="name" placeholder="{{ .GameName }}*" required title="Enter the game name" alt="Enter the game name">
-                <input type="text" name="bgg_url" placeholder="BGG URL">
+            <form action="{{ .Id }}/add-game" method="post" autocomplete="off">
+                <input type="text" id="gameNameInput" name="name" placeholder="{{ .GameName }}*" required title="Enter the game name" alt="Enter the game name" autocomplete="off">
+                <div id="autocomplete-list" class="autocomplete-items" style="position:relative;z-index:10;"></div>
+                <input type="text" id="bggUrlInput" name="bgg_url" placeholder="BGG URL">
                 <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
                 <input type="text" name="user_id" placeholder="Your username" id="userID" required hidden>
                 <button type="submit">{{ .AddGame }}</button>
@@ -211,6 +259,54 @@
                     console.error("Error:", error);
                 });
             });
+        });
+
+        // --- Autocomplete for game name ---
+        const gameNameInput = document.getElementById('gameNameInput');
+        const bggUrlInput = document.getElementById('bggUrlInput');
+        const autocompleteList = document.getElementById('autocomplete-list');
+
+
+        let debounceTimeout;
+        gameNameInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            if (!query) {
+                autocompleteList.innerHTML = '';
+                return;
+            }
+            autocompleteList.innerHTML = `<div class="autocomplete-loading"><span class="autocomplete-spinner"></span>Loading...</div>`;
+            debounceTimeout = setTimeout(() => {
+                fetch(`/bgg/search?name=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        autocompleteList.innerHTML = '';
+                        if (Array.isArray(data) && data.length > 0) {
+                            data.forEach(game => {
+                                const item = document.createElement('div');
+                                item.textContent = game.name;
+                                item.addEventListener('mousedown', function(e) {
+                                    gameNameInput.value = game.name;
+                                    if (game.bgg_url) bggUrlInput.value = game.bgg_url;
+                                    autocompleteList.innerHTML = '';
+                                });
+                                autocompleteList.appendChild(item);
+                            });
+                        } else {
+                            autocompleteList.innerHTML = '<div class="autocomplete-loading">No results found</div>';
+                        }
+                    })
+                    .catch(() => {
+                        autocompleteList.innerHTML = '<div class="autocomplete-loading">Error loading suggestions</div>';
+                    });
+            }, 250);
+        });
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!autocompleteList.contains(e.target) && e.target !== gameNameInput) {
+                autocompleteList.innerHTML = '';
+            }
         });
     </script>
 </body>

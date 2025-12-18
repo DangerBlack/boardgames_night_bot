@@ -199,7 +199,7 @@ func ExtractBoardGameID(inputURL string) (int64, bool) {
 	}
 
 	// Define regex to extract the ID
-	pattern := `^/boardgame/(\d+)/[a-zA-Z0-9-]+$`
+	pattern := `^/boardgame/(\d+)/?[a-zA-Z0-9-]*$`
 	re := regexp.MustCompile(pattern)
 	matches := re.FindStringSubmatch(parsedURL.Path)
 
