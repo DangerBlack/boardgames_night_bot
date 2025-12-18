@@ -164,6 +164,7 @@ func main() {
 	bot.Handle("/create", telegram.CreateGame)
 	bot.Handle("/add_game", telegram.AddGame)
 	bot.Handle("/language", telegram.SetLanguage)
+	bot.Handle("/location", telegram.SetDefaultLocation)
 
 	bot.Handle(telebot.OnText, func(c telebot.Context) error {
 		if c.Message().ReplyTo == nil {
