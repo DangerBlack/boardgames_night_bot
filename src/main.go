@@ -125,6 +125,7 @@ func main() {
 	log.Println("database connection established.")
 
 	db.CreateTables()
+	db.MigrateToV1()
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:     botToken,

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -43,6 +44,7 @@ func (d *Database) CreateTables() {
 		`CREATE TABLE IF NOT EXISTS chats (
 			chat_id INTEGER NOT NULL,
 			language TEXT NOT NULL DEFAULT 'en',
+			default_location TEXT,
 			PRIMARY KEY(chat_id)
 			UNIQUE(chat_id) ON CONFLICT REPLACE
 		);`,
@@ -53,6 +55,8 @@ func (d *Database) CreateTables() {
 			user_name TEXT,
 			name TEXT,
 			message_id INTEGER,
+    		location TEXT,
+    		starts_at TIMESTAMP,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 		`CREATE TABLE IF NOT EXISTS boardgames (
@@ -89,14 +93,48 @@ func (d *Database) CreateTables() {
 	log.Println("database tables ensured")
 }
 
+func (d *Database) MigrateToV1() {
+	var err error
+	err = d.addColumnIfNotExists("events", "location", "TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = d.addColumnIfNotExists("events", "starts_at", "TIMESTAMP")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = d.addColumnIfNotExists("chats", "default_location", "TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func (d *Database) Close() {
 	d.db.Close()
 	log.Println("database connection closed")
 }
 
-func (d *Database) InsertEvent(chatID, userID int64, userName, name string, messageID *int64) (string, error) {
+func (d *Database) InsertEvent(chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
 	var eventID string
-	query := `INSERT INTO events (id, chat_id, user_id, user_name, name, message_id) VALUES (@event_id, @chat_id, @user_id, @user_name, @name, @message_id) RETURNING id;`
+	query := `INSERT INTO events 
+	(id, chat_id, user_id, user_name, name, message_id, location, starts_at) 
+	VALUES 
+	(
+		@event_id, 
+		@chat_id, 
+		@user_id, 
+		@user_name,
+		@name, 
+		@message_id, 
+		COALESCE(
+			@location,
+			(SELECT default_location FROM chats WHERE chat_id = @chat_id)
+    	), 
+		@starts_at
+	) 
+	RETURNING id;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
@@ -106,6 +144,8 @@ func (d *Database) InsertEvent(chatID, userID int64, userName, name string, mess
 			"user_name":  userName,
 			"name":       name,
 			"message_id": messageID,
+			"location":   location,
+			"starts_at":  startsAt,
 		})...,
 	).Scan(&eventID); err != nil {
 		return "", err
@@ -122,6 +162,8 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	e.chat_id,
 	e.message_id,
 	e.user_id,
+	e.starts_at,
+	e.location,
 	b.id,
 	b.name,
 	b.max_players,
@@ -147,6 +189,8 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	e.chat_id,
 	e.message_id,
 	e.user_id,
+	e.starts_at,
+	e.location,
 	b.id,
 	b.name,
 	b.max_players,
@@ -180,7 +224,8 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var participant models.Participant
 
 		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID pgtype.Int8
-		var boardGameName, participantUserName, bggName, bggUrl, bggImageUrl pgtype.Text
+		var boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
+		var startsAt pgtype.Timestamp
 
 		if err := rows.Scan(
 			&event.ID,
@@ -188,6 +233,8 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&event.ChatID,
 			&eventMessageID,
 			&event.UserID,
+			&startsAt,
+			&location,
 			&boardGameID,
 			&boardGameName,
 			&boardGameMaxPlayers,
@@ -204,6 +251,8 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 		event.MessageID = IntOrNil(eventMessageID)
 		event.Locked = strings.Contains(event.Name, "🔒")
+		event.StartsAt = TimeOrNil(startsAt)
+		event.Location = StringOrNil(location)
 
 		if IntOrNil(boardGameID) != nil {
 			boardGame = models.BoardGame{
@@ -478,6 +527,26 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	return language
 }
 
+func (d *Database) addColumnIfNotExists(table, column, columnType string) error {
+	query := `
+		SELECT 1
+		FROM pragma_table_info(?)
+		WHERE name = ?;
+	`
+
+	var exists int
+
+	err := d.db.QueryRow(query, table, column).Scan(&exists)
+	if err == sql.ErrNoRows {
+		log.Println("migrating database: adding column", column, "to table", table)
+		alter := "ALTER TABLE " + table + " ADD COLUMN " + column + " " + columnType
+		_, err = d.db.Exec(alter)
+		return err
+	}
+
+	return err
+}
+
 func IntOrNil(i pgtype.Int8) *int64 {
 	if i.Valid {
 		v := i.Int64
@@ -502,4 +571,13 @@ func ParseError(err error) error {
 	}
 
 	return err
+}
+
+func TimeOrNil(t pgtype.Timestamp) *time.Time {
+	if t.Valid {
+		v := t.Time
+		return &v
+	}
+
+	return nil
 }

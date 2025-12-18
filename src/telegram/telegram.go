@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/DangerBlack/gobgg"
 
@@ -18,6 +20,9 @@ import (
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"gopkg.in/telebot.v3"
 )
+
+var dateTimeRegex = `\d{2}-\d{2}-\d{4} \d{2}:\d{2}`
+var locationRegex = `📍(.+)\n`
 
 type Telegram struct {
 	Bot            *telebot.Bot
@@ -113,18 +118,56 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	userID := c.Sender().ID
 	userName := DefineUsername(c.Sender())
 	chatID := c.Chat().ID
+	var startsAt *time.Time
+	var location *string
+
+	fullText := c.Message().Text
+	log.Println("Full text for parsing:", fullText)
+
+	// check regex for datetime at the end of the event name DD-MM-YYYY HH:MM
+	matched, err := regexp.MatchString(dateTimeRegex, fullText)
+	if err != nil {
+		log.Println("failed to parse date time:", err)
+	}
+	if matched {
+		re := regexp.MustCompile(dateTimeRegex)
+		dateTimeStr := re.FindString(fullText)
+		layout := "02-01-2006 15:04"
+		t, err := time.Parse(layout, dateTimeStr)
+		if err != nil {
+			log.Println("failed to parse date time:", err)
+		} else {
+			log.Printf("Parsed date time: %s\n", t.String())
+			startsAt = &t
+		}
+	}
+
+	// check regex for location
+	matchedLoc, err := regexp.MatchString(locationRegex, fullText)
+	if err != nil {
+		log.Println("failed to parse location:", err)
+	}
+	if matchedLoc {
+		re := regexp.MustCompile(locationRegex)
+		locationStr := re.FindStringSubmatch(fullText)
+		if len(locationStr) > 1 {
+			loc := strings.TrimSpace(locationStr[1])
+			log.Printf("Parsed location: %s\n", loc)
+			location = &loc
+		}
+	}
 
 	var eventID string
 	log.Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
 
-	if eventID, err = t.DB.InsertEvent(chatID, userID, userName, eventName, nil); err != nil {
+	if eventID, err = t.DB.InsertEvent(chatID, userID, userName, eventName, nil, location, startsAt); err != nil {
 		log.Println("failed to create event:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToCreateEvent"}})
 		return c.Reply(failedT)
 	}
 	log.Printf("Event created with id: %s", eventID)
 
-	if strings.Contains(eventName, "👥") {
+	if strings.Contains(fullText, "👥") {
 		if _, err = t.DB.InsertBoardGame(eventID, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
 			log.Println("failed to add game:", err)
 			failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})

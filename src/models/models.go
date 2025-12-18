@@ -27,6 +27,8 @@ type Event struct {
 	Name       string
 	BoardGames []BoardGame
 	Locked     bool
+	Location   *string
+	StartsAt   *time.Time
 }
 
 type AddPlayerRequest struct {
