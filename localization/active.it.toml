@@ -1,4 +1,20 @@
-Welcome = "Benvenuto nel Boardgame Night Bot! 🎲\nSiamo qui per aiutarti a organizzare la tua serata di giochi da tavolo.\nUtilizzo:\nUsa /create [nome evento] per creare un nuovo evento, aggiungi il 🔒 se vuoi che l'evento sia modificabile solo da te.\nUsa /add_game [nome gioco] per aggiungere giochi all'evento.\nUsa /language [lan] per impostare la lingua del bot.\nClicca sui pulsanti per unirti o lasciare un gioco.\nDivertiti! 🎉"  
+Welcome = """
+Benvenuto nel Boardgame Night Bot! 🎲
+Siamo qui per aiutarti a organizzare la tua serata di giochi da tavolo.
+
+Utilizzo:
+- Usa /create [nome evento] per creare un nuovo evento.
+  Opzioni disponibili durante la creazione:
+    🔒 Rendi l'evento modificabile solo da te
+    📍 Definisci la location dell'evento
+    👥 Aggiungi un bottone per permettere agli utenti di partecipare senza scegliere un gioco
+- Usa /add_game [nome gioco] per aggiungere giochi all'evento.
+- Usa /language [lan] per impostare la lingua del bot (en/it/de).
+- Usa /location [luogo] per impostare o aggiornare la location usata di default della chat.
+
+Clicca sui pulsanti per unirti o lasciare un gioco.
+Divertiti! 🎉
+"""  
 
 Usage = "Utilizzo: {{.Command}} {{.Example}}"
 
@@ -11,6 +27,7 @@ FailedToUpdateMessageEvent = "Impossibile aggiornare il messaggio. Per favore ri
 FailedToUpdateGame = "Impossibile aggiornare il gioco. Per favore riprova."  
 FailedToGetGameInfo = "Impossibile ottenere le informazioni del gioco da BoardGameGeek. Per favore riprova."  
 FailedToSetLanguage = "Impostazione della lingua non riuscita. Per favore riprova."
+FailedToSetLocation = "Impostazione della posizione non riuscita. Per favore riprova."
 FailedToAddPlayer = "Impossibile aggiungere il giocatore. Per favore riprova."  
 FailedToRemovePlayer = "Impossibile rimuovere il giocatore. Per favore riprova." 
 FailedLanguageNotAvailable = "Lingua non disponibile. Per favore riprova con una di queste lingue disponibili: {{.AvailableLanguages}}."
@@ -22,6 +39,7 @@ InvalidData = "Dati non validi. Per favore riprova."
 GameAdded = "Gioco <b>{{.Name}}</b>{{.Link}} aggiunto! (1/{{.MaxPlayers}} giocatori).\nRispondi a questo messaggio con il numero massimo di giocatori per aggiornarlo (predefinito {{.MaxPlayers}}).\nPuoi anche inviarmi il link di https://boardgamegeek.com/ per aggiornare le informazioni del gioco.\nClicca sul pulsante per partecipare."
 GameUpdated = "Gioco aggiornato!"
 LanguageSet = "Lingua impostata su {{.Language}}."
+LocationSet = "Posizione predefinita impostata su {{.Location}}."
 
 GameNotFound = "Gioco non trovato. Stai cercando di aggiornare le informazioni di un gioco che non esiste. Probabilmente stai commentando il messaggio sbagliato."  
 EventNotFound = "Evento non trovato."

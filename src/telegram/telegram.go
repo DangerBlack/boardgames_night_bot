@@ -537,7 +537,7 @@ func (t Telegram) SetLanguage(c telebot.Context) error {
 		))
 	}
 
-	if err := t.DB.InsertChat(chatID, language); err != nil {
+	if err := t.DB.InsertChat(chatID, &language, nil); err != nil {
 		log.Println("failed to set language:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLanguage"}}))
 	}
@@ -548,6 +548,42 @@ func (t Telegram) SetLanguage(c telebot.Context) error {
 		},
 		TemplateData: map[string]string{
 			"Language": language,
+		},
+	})
+
+	return c.Reply(messageT)
+}
+
+func (t Telegram) SetDefaultLocation(c telebot.Context) error {
+	args := c.Args()
+	if len(args) < 1 {
+		usageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+			DefaultMessage: &i18n.Message{
+				ID: "Usage",
+			},
+			TemplateData: map[string]string{
+				"Command": "/location",
+				"Example": "Circolo degli Artisti, Rome",
+			},
+		})
+		return c.Reply(usageT)
+	}
+
+	chatID := c.Chat().ID
+	location := strings.Join(args[0:], " ")
+	log.Printf("Setting location to %s in chat %d", location, chatID)
+
+	if err := t.DB.InsertChat(chatID, nil, &location); err != nil {
+		log.Println("failed to set language:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLocation"}}))
+	}
+
+	messageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "LocationSet",
+		},
+		TemplateData: map[string]string{
+			"Location": location,
 		},
 	})
 

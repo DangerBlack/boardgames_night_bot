@@ -1,4 +1,20 @@
-Welcome = "Willkommen beim Boardgame Night Bot! 🎲\nWir helfen dir, deinen Spieleabend zu organisieren.\nVerwendung:\nNutze /create [Ereignisname], um ein neues Ereignis zu erstellen.\nNutze /add_game [Spielname], um Spiele zum Ereignis hinzuzufügen.\nNutze /language [Sprache], um die Sprache des Bots einzustellen.\nKlicke auf die Schaltflächen, um einem Spiel beizutreten oder es zu verlassen.\nViel Spaß! 🎉"
+Welcome = """
+Willkommen beim Boardgame Night Bot! 🎲
+Wir helfen dir dabei, deinen Spieleabend zu organisieren.
+
+Verwendung:
+- Nutze /create [Eventname], um ein neues Event zu erstellen.
+  Verfügbare Optionen während der Erstellung:
+    🔒 Das Event nur von dir bearbeitbar machen
+    📍 Den Veranstaltungsort festlegen
+    👥 Einen Button hinzufügen, der es Nutzern erlaubt teilzunehmen, ohne ein bestimmtes Spiel auszuwählen
+- Nutze /add_game [Spielname], um Spiele zum Event hinzuzufügen.
+- Nutze /language [lan], um die Sprache des Bots einzustellen (en/it/de).
+- Nutze /location [Ort], um den Standardort des Chats festzulegen oder zu aktualisieren.
+
+Klicke auf die Buttons, um einem Spiel beizutreten oder es zu verlassen.
+Viel Spaß! 🎉
+"""
 
 Usage = "Verwendung: {{.Command}} {{.Example}}"
 
@@ -11,6 +27,7 @@ FailedToUpdateMessageEvent = "Nachricht konnte nicht aktualisiert werden. Bitte 
 FailedToUpdateGame = "Spiel konnte nicht aktualisiert werden. Bitte versuche es erneut."
 FailedToGetGameInfo = "Spielinformationen von BoardGameGeek konnten nicht abgerufen werden. Bitte versuche es erneut."
 FailedToSetLanguage = "Sprache konnte nicht festgelegt werden. Bitte versuche es erneut."
+FailedToSetLocation = "Standort konnte nicht festgelegt werden. Bitte versuche es erneut."
 FailedToAddPlayer = "Spieler konnte nicht hinzugefügt werden. Bitte versuche es erneut."
 FailedToRemovePlayer = "Spieler konnte nicht entfernt werden. Bitte versuche es erneut."
 FailedLanguageNotAvailable = "Sprache nicht verfügbar. Bitte versuche es erneut mit einer der folgenden verfügbaren Sprachen: {{.AvailableLanguages}}."
@@ -22,6 +39,7 @@ InvalidData = "Ungültige Daten. Bitte versuche es erneut."
 GameAdded = "Spiel <b>{{.Name}}</b>{{.Link}} hinzugefügt! (1/{{.MaxPlayers}} Spieler).\nAntworte auf diese Nachricht mit der maximalen Spieleranzahl, um sie zu aktualisieren (Standard: {{.MaxPlayers}}).\nDu kannst mir auch den https://boardgamegeek.com/ Link senden, um die Spielinformationen zu aktualisieren.\nKlicke auf den Button, um beizutreten."
 GameUpdated = "Spiel aktualisiert!"
 LanguageSet = "Sprache auf {{.Language}} gesetzt."
+LocationSet = "Standardstandort auf {{.Location}} gesetzt."
 
 GameNotFound = "Spiel nicht gefunden. Du versuchst, die Informationen eines Spiels zu aktualisieren, das nicht existiert. Wahrscheinlich kommentierst du die falsche Nachricht."
 EventNotFound = "Ereignis nicht gefunden."

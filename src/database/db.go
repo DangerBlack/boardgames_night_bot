@@ -492,18 +492,25 @@ func (d *Database) RemoveParticipant(eventID string, userID int64) error {
 	return nil
 }
 
-func (d *Database) InsertChat(chatID int64, language string) error {
+func (d *Database) InsertChat(chatID int64, language *string, location *string) error {
 	query := `
-		INSERT INTO chats (chat_id, language) 
-		VALUES (@chat_id, @language)
-		ON CONFLICT (chat_id) 
-		DO UPDATE SET language = EXCLUDED.language;
+		INSERT INTO chats (chat_id, language, default_location) 
+		VALUES (
+			@chat_id,
+			COALESCE(@language, (SELECT language FROM chats WHERE chat_id = @chat_id), 'en'),
+			@default_location
+		)
+		ON CONFLICT(chat_id) DO UPDATE SET
+			language = COALESCE(EXCLUDED.language, language, 'en'),
+			default_location = COALESCE(EXCLUDED.default_location, default_location);
+
 	`
 
 	if _, err := d.db.Exec(query,
 		NamedArgs(map[string]any{
-			"chat_id":  chatID,
-			"language": language,
+			"chat_id":          chatID,
+			"language":         language,
+			"default_location": location,
 		})...,
 	); err != nil {
 		return err

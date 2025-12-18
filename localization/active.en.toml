@@ -1,4 +1,20 @@
-Welcome = "Welcome to Boardgame Night Bot! 🎲\nWe are here to help you organize your boardgame night.\nUsage:\nUse /create [event name] to create a new event, add 🔒 if you want to be the only one who can edit the event.\nUse /add_game [game name] to add games to the event.\nUse /language [lan] to set the language of the bot.\nClick on the buttons to join or leave a game.\nHave fun! 🎉"
+Welcome = """
+Welcome to the Boardgame Night Bot! 🎲
+We are here to help you organize your board game night.
+
+How to use:
+- Use /create [event name] to create a new event.
+  Options available during creation:
+    🔒 Make the event editable only by you
+    📍 Set the event location
+    👥 Add a button that allows users to participate without choosing a specific game
+- Use /add_game [game name] to add games to the event.
+- Use /language [lan] to set the bot language (en/it/de).
+- Use /location [location] to set or update the default location for the chat.
+
+Click the buttons to join or leave a game.
+Have fun! 🎉
+"""
 
 Usage = "Usage: {{.Command}} {{.Example}}"
 
@@ -11,6 +27,7 @@ FailedToUpdateMessageEvent = "Failed to update message. Please try again."
 FailedToUpdateGame = "Failed to update game. Please try again."
 FailedToGetGameInfo = "Failed to get game info from BoardGameGeek. Please try again."
 FailedToSetLanguage = "Failed to set language. Please try again."
+FailedToSetLocation = "Failed to set location. Please try again."
 FailedToAddPlayer = "Failed to add player. Please try again."
 FailedToRemovePlayer = "Failed to remove player. Please try again."
 FailedLanguageNotAvailable = "Language not available. Please try again with one of these available languages: {{.AvailableLanguages}}."
@@ -22,6 +39,7 @@ InvalidData = "Invalid data. Please try again."
 GameAdded = "Game <b>{{.Name}}</b>{{.Link}} added! (1/{{.MaxPlayers}} players).\nReply to this message with the max number of player to update (default {{.MaxPlayers}})\nYou can also send me the https://boardgamegeek.com/ link to update the game info.\nClick button to join."
 GameUpdated = "Game updated!"
 LanguageSet = "Language set to {{.Language}}."
+LocationSet = "Default location set to {{.Location}}."
 
 GameNotFound = "Game not found. You are trying to update the information of a game that does not exist. You are probably commenting on the wrong message."
 EventNotFound = "Event not found."
