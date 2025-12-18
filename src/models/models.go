@@ -133,6 +133,15 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, baseUrl string, botName stri
 	btns := []telebot.InlineButton{}
 
 	msg := "📆 <b>" + e.Name + "</b>\n\n"
+	if e.StartsAt != nil {
+		msg += "⏰ <b>" + e.StartsAt.Format("2006-01-02 15:04") + "</b>\n"
+	}
+	if e.Location != nil && *e.Location != "" {
+		msg += "📍 <b>" + *e.Location + "</b>\n"
+	}
+	if e.Location != nil || e.StartsAt != nil {
+		msg += "\n"
+	}
 	for _, bg := range e.BoardGames {
 		bgMsg, btn, err := e.FormatBG(localizer, baseUrl, botName, bg)
 		if err != nil {
@@ -244,6 +253,19 @@ func ExtractGameInfo(ctx context.Context, BGG *gobgg.BGG, id int64, gameName str
 	}
 
 	return maxPlayers, bgName, bgUrl, bgImageUrl, nil
+}
+
+func (e Event) FormatStartAt() *string {
+	return formatTimePtr(e.StartsAt)
+}
+
+func formatTimePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+
+	str := t.Format("2006-01-02 15:04")
+	return &str
 }
 
 const MessageUnchangedErrorMessage = "specified new message content and reply markup are exactly the same as a current content and reply markup of the message"
