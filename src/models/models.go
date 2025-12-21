@@ -176,8 +176,8 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 
 	btns = append(btns, btn)
 
-	log.Default().Printf("Chat is a group chat: %d", e.ChatID)
-	// Chat is a group chat
+	log.Default().Printf("Adding AddGame button for chat: %d", e.ChatID)
+	// Add "AddGame" button for this chat
 	btn2 := telebot.InlineButton{
 		Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "AddGame"}),
 		URL:  fmt.Sprintf("%s?startapp=%s", url.BotMiniAppURL, e.ID),
