@@ -50,7 +50,7 @@ go run src/main.go
 
 ## Test locally
 
-Create a forward using ngrok to port 8080 and past the link provided into `BOT_MINI_APP_URL` .env than edit bot mini app url settings in bot father
+Create a forward using ngrok to port 8080 and paste the link provided into `BOT_MINI_APP_URL` .env then edit bot mini app url settings in bot father
 ```bash
 ngrok http 8080
 ```
