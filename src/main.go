@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"time"
@@ -96,9 +95,9 @@ func main() {
 		log.Fatal("the TOKEN is not set in .env file")
 	}
 
-	botName := os.Getenv("BOT_NAME")
-	if botToken == "" {
-		log.Fatal("the BOT_NAME is not set in .env file")
+	botMiniAppURL := os.Getenv("BOT_MINI_APP_URL")
+	if botMiniAppURL == "" {
+		log.Fatal("the BOT_MINI_APP_URL is not set in .env file")
 	}
 
 	healthCheckUrl := os.Getenv("HEALTH_CHECK_URL")
@@ -109,7 +108,6 @@ func main() {
 		log.Fatal("the BGG_TOKEN is not set in .env file")
 	}
 
-	baseUrl := os.Getenv("BASE_URL")
 	portString := StringOrDefault(os.Getenv("PORT"), "8080")
 	port, err := strconv.Atoi(portString)
 	if err != nil {
@@ -153,47 +151,18 @@ func main() {
 		BGG:            bgg,
 		LanguageBundle: bundle,
 		LanguagePack:   lp,
-		BaseUrl:        baseUrl,
-		BotName:        botName,
+		Url: models.WebUrl{
+			BotMiniAppURL: botMiniAppURL,
+		},
 	}
 
 	log.Println("bot started")
 
-	bot.Handle("/start", telegram.Start)
-	bot.Handle("/help", telegram.Start)
-	bot.Handle("/create", telegram.CreateGame)
-	bot.Handle("/add_game", telegram.AddGame)
-	bot.Handle("/language", telegram.SetLanguage)
-	bot.Handle("/location", telegram.SetDefaultLocation)
-
-	bot.Handle(telebot.OnText, func(c telebot.Context) error {
-		if c.Message().ReplyTo == nil {
-			return nil
-		}
-
-		return telegram.UpdateGameDispatcher(c)
-	})
-
-	bot.Handle(telebot.OnCallback, func(c telebot.Context) error {
-		data := c.Callback().Data
-		parts := strings.Split(data, "|")
-
-		action := "$" + strings.Split(parts[0], "$")[1]
-
-		log.Printf("User clicked on button: *%s* %d", action, len(action))
-		switch action {
-		case string(models.AddPlayer):
-			return telegram.CallbackAddPlayer(c)
-		case string(models.Cancel):
-			return telegram.CallbackRemovePlayer(c)
-		}
-
-		return c.Reply("invalid action")
-	})
+	telegram.SetupHandlers()
 
 	go func() {
 		log.Println("server started")
-		web.StartServer(port, db, bgg, bot, bundle, baseUrl, botName)
+		web.StartServer(port, db, bgg, bot, bundle, botMiniAppURL)
 		log.Println("server stopped")
 	}()
 	go func() {

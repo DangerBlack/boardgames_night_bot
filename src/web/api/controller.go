@@ -25,19 +25,19 @@ type Controller struct {
 	BGG            *gobgg.BGG
 	Bot            *telebot.Bot
 	LanguageBundle *i18n.Bundle
-	BaseUrl        string
-	BotName        string
+	Url            models.WebUrl
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, baseUrl, botName string) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, botMiniAppURL string) *Controller {
 	return &Controller{
 		Router:         router,
 		DB:             db,
 		BGG:            bgg,
 		Bot:            bot,
 		LanguageBundle: LanguageBundle,
-		BaseUrl:        baseUrl,
-		BotName:        botName,
+		Url: models.WebUrl{
+			BotMiniAppURL: botMiniAppURL,
+		},
 	}
 }
 
@@ -355,6 +355,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 func (c *Controller) DeleteGame(ctx *gin.Context) {
 	var err error
 	eventID := ctx.Param("event_id")
+	log.Println("Deleting game for event:", eventID)
 	gameID, err2 := strconv.ParseInt(ctx.Param("game_id"), 10, 64)
 	if err2 != nil {
 		c.renderError(ctx, nil, nil, "Invalid game ID")
@@ -423,12 +424,17 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 
 	options := &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
+		ReplyTo: &telebot.Message{
+			ID: int(*event.MessageID),
+		},
 	}
 
+	log.Printf("Sending delete message to chat %d: %s", to.ID, message)
 	if _, err = c.Bot.Send(to, message, options); err != nil {
 		log.Println("failed to send message:", err)
 	}
 
+	log.Printf("Game %s deleted from event %s", game.Name, event.Name)
 	if _, err = c.updateTelegram(ctx, eventID); err != nil {
 		log.Println("failed to update telegram", err)
 	}
@@ -634,7 +640,7 @@ func (c *Controller) updateTelegram(ctx *gin.Context, eventID string) (*models.E
 		return nil, err
 	}
 
-	body, markup := event.FormatMsg(c.Localizer(&event.ChatID), c.BaseUrl, c.BotName)
+	body, markup := event.FormatMsg(c.Localizer(&event.ChatID), c.Url)
 
 	_, err = c.Bot.Edit(&telebot.Message{
 		ID: int(*event.MessageID),

@@ -23,8 +23,8 @@ To install the Boardgame Night Bot, follow these steps:
     ```
     TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     HEALTH_CHECK_URL=https://hc-ping.com/xxxxxxxxxxxxxxxxxxx
-    BASE_URL=https://xxxxxxxxxxxxxxxxxxxxxxxxx.com
-    BOT_NAME=name_of_your_bot 
+    BOT_NAME=name_of_your_bot
+    BOT_MINI_APP_URL=https://t.me/botname/miniapp_name
     PORT=8080
     DB_PATH=./archive 
     BGG_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -46,6 +46,13 @@ To start the bot, run the following command:
 
 ```bash
 go run src/main.go
+```
+
+## Test locally
+
+Create a forward using ngrok to port 8080 and past the link provided into `BOT_MINI_APP_URL` .env than edit bot mini app url settings in bot father
+```bash
+ngrok http 8080
 ```
 
 ## Docker
@@ -74,7 +81,7 @@ services:
     environment:
       - TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       - HEALTH_CHECK_URL=https://hc-ping.com/xxxxxxxxxxxxxxxxxxx
-      - BASE_URL=https://xxxxxxxxxxxxxxxxxxxxxxxxx.com
+      - BOT_MINI_APP_URL=https://t.me/name_of_your_bot/home
       - BOT_NAME=name_of_your_bot 
       - DB_PATH=/archive
       - BGG_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

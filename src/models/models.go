@@ -76,7 +76,11 @@ const (
 	Cancel    EventAction = "$cancel"
 )
 
-func (e Event) FormatBG(localizer *i18n.Localizer, baseUrl string, botName string, bg BoardGame) (string, telebot.InlineButton, error) {
+type WebUrl struct {
+	BotMiniAppURL string
+}
+
+func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (string, telebot.InlineButton, error) {
 	msg := ""
 
 	complete := ""
@@ -129,7 +133,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, baseUrl string, botName strin
 	return msg, btn, nil
 }
 
-func (e Event) FormatMsg(localizer *i18n.Localizer, baseUrl string, botName string) (string, *telebot.ReplyMarkup) {
+func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebot.ReplyMarkup) {
 	btns := []telebot.InlineButton{}
 
 	msg := "📆 <b>" + e.Name + "</b>\n\n"
@@ -143,7 +147,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, baseUrl string, botName stri
 		msg += "\n"
 	}
 	for _, bg := range e.BoardGames {
-		bgMsg, btn, err := e.FormatBG(localizer, baseUrl, botName, bg)
+		bgMsg, btn, err := e.FormatBG(localizer, url, bg)
 		if err != nil {
 			log.Printf("Failed to format board game: %v", err)
 			continue
@@ -172,22 +176,13 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, baseUrl string, botName stri
 
 	btns = append(btns, btn)
 
-	if e.ChatID > 0 {
-		btn2 := telebot.InlineButton{
-			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "AddGame"}),
-			WebApp: &telebot.WebApp{
-				URL: fmt.Sprintf("%s/events/%s/", baseUrl, e.ID),
-			},
-		}
-		btns = append(btns, btn2)
-	} else {
-		btn2 := telebot.InlineButton{
-			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "AddGame"}),
-			URL:  fmt.Sprintf("https://t.me/%s/home?startapp=%s", botName, e.ID),
-		}
-		btns = append(btns, btn2)
-
+	log.Default().Printf("Chat is a group chat: %d", e.ChatID)
+	// Chat is a group chat
+	btn2 := telebot.InlineButton{
+		Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "AddGame"}),
+		URL:  fmt.Sprintf("%s?startapp=%s", url.BotMiniAppURL, e.ID),
 	}
+	btns = append(btns, btn2)
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{}
