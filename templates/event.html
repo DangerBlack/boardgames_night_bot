@@ -289,11 +289,11 @@
                         autocompleteList.innerHTML = '';
                         if (Array.isArray(data) && data.length > 0) {
                             data.forEach(game => {
+                                if (!game.name)
+                                    return;
+
                                 const item = document.createElement('div');
                                 item.textContent = game.name;
-                                
-                                if(!game.name)
-                                    return;
 
                                 item.addEventListener('mousedown', function(e) {
                                     gameNameInput.value = game.name;
