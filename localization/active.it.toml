@@ -31,6 +31,8 @@ FailedToSetLocation = "Impostazione della posizione non riuscita. Per favore rip
 FailedToAddPlayer = "Impossibile aggiungere il giocatore. Per favore riprova."  
 FailedToRemovePlayer = "Impossibile rimuovere il giocatore. Per favore riprova." 
 FailedLanguageNotAvailable = "Lingua non disponibile. Per favore riprova con una di queste lingue disponibili: {{.AvailableLanguages}}."
+FailedToRegisterWebhook = "Impossibile registrare il webhook. Per favore riprova. Assicurati di avere una chat privata con il bot."
+FailedToUnregisterWebhook = "Impossibile annullare la registrazione del webhook. Per favore riprova."
 
 InvalidNumberOfPlayers = "Numero di giocatori non valido. Per favore riprova."  
 InvalidBggURL = "L'URL di BoardGameGeek è invalido. Per favore riprova."
@@ -53,9 +55,20 @@ NotComing = "Non partecipo"
 AddGame = "Aggiungi un gioco"
 Players = "partecipanti"
 GameHasBeenDeleted = "Il gioco {{.Game}} è stato eliminato dall'evento {{.Event}} da {{.Username}}."
+WebhookRegistered = "Webhook  {{.WebhookUrl}} registrato con successo."
+InvalidWebhookURL = "L'URL del webhook non è valido. Assicurati che inizi con http:// o https:// e riprova."
+WebhookTestSendPrivateMessage = "Verifico di poterti inviare messaggi privati per registrare correttamente il webhook."
+WebhookSecret = """Webhook creato per la chat <b>{{.ChatName}}</b>!
+
+🔑 <b>Segreto:</b>
+<code>{{.Secret}}</code>
+🌐 <b>Webhook:</b> 
+<code>{{.WebhookUrl}}</code>
+
+Conserva questo segreto in un luogo sicuro. Usalo per validare la firma HMAC delle richieste ricevute."""
+OnlyAdminsCanRegisterWebhook = "Solo gli amministratori della chat possono registrare un webhook."
 
 Open = "Premi qui per aprire le impostazioni dell'evento {{.Name}} e partecipare."
-
 
 WebNoParticipants = "Ancora nessun partecipante."
 WebPlayers = "partecipanti"
