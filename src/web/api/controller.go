@@ -491,7 +491,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 			log.Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
-			if bg.MaxPlayers == nil {
+			if bg.MaxPlayers == nil || *bg.MaxPlayers == 0 {
 				bg.MaxPlayers = bgMaxPlayers
 			}
 		}
