@@ -291,6 +291,10 @@
                             data.forEach(game => {
                                 const item = document.createElement('div');
                                 item.textContent = game.name;
+                                
+                                if(!game.name)
+                                    return;
+
                                 item.addEventListener('mousedown', function(e) {
                                     gameNameInput.value = game.name;
                                     if (game.bgg_url) bggUrlInput.value = game.bgg_url;
