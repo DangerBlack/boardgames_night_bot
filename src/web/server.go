@@ -12,14 +12,14 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-func StartServer(port int, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, bundle *i18n.Bundle, baseUrl, botName string) {
+func StartServer(port int, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, bundle *i18n.Bundle, botMiniAppURL string) {
 	var err error
 	router := gin.Default()
 
 	router.Use(gin.Logger())
 	router.LoadHTMLGlob("templates/*")
 
-	controller := api.NewController(router.Group("/"), db, bgg, bot, bundle, baseUrl, botName)
+	controller := api.NewController(router.Group("/"), db, bgg, bot, bundle, botMiniAppURL)
 
 	controller.InjectRoute()
 
