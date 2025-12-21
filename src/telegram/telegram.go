@@ -4,6 +4,7 @@ import (
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/language"
 	"boardgame-night-bot/src/models"
+	"boardgame-night-bot/src/utils"
 	"context"
 	"errors"
 	"fmt"
@@ -40,6 +41,7 @@ func (t Telegram) SetupHandlers() {
 	t.Bot.Handle("/add_game", t.AddGame)
 	t.Bot.Handle("/language", t.SetLanguage)
 	t.Bot.Handle("/location", t.SetDefaultLocation)
+	t.Bot.Handle("/register", t.RegisterWebhook)
 
 	t.Bot.Handle(telebot.OnText, func(c telebot.Context) error {
 		if c.Message().ReplyTo == nil {
@@ -55,12 +57,14 @@ func (t Telegram) SetupHandlers() {
 
 		action := "$" + strings.Split(parts[0], "$")[1]
 
-		log.Printf("User clicked on button: *%s* %d", action, len(action))
+		log.Printf("User clicked on button: *%s* %d", action, len(parts))
 		switch action {
 		case string(models.AddPlayer):
 			return t.CallbackAddPlayer(c)
 		case string(models.Cancel):
 			return t.CallbackRemovePlayer(c)
+		case string(models.Unregister):
+			return t.CallbackUnregisterWebhook(c)
 		}
 
 		return c.Reply("invalid action")
@@ -625,6 +629,125 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 	return c.Reply(messageT)
 }
 
+func (t Telegram) RegisterWebhook(c telebot.Context) error {
+	args := c.Args()
+	if len(args) < 1 {
+		usageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+			DefaultMessage: &i18n.Message{
+				ID: "Usage",
+			},
+			TemplateData: map[string]string{
+				"Command": "/register",
+				"Example": "https://example.com/webhook",
+			},
+		})
+		return c.Reply(usageT)
+	}
+
+	var err error
+	var secret string
+	chatID := c.Chat().ID
+	if secret, err = utils.GenerateSecret(32); err != nil {
+		log.Println("failed to register webhook:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
+	}
+	webhookUrl := args[0]
+	chatName := ""
+	chat := c.Chat()
+	if chat.Title != "" {
+		// Group or channel name
+		chatName = chat.Title
+	}
+
+	if chatID < 0 {
+		var admins []telebot.ChatMember
+		if admins, err = t.Bot.AdminsOf(c.Chat()); err != nil {
+			log.Println("failed to get chat admins:", err)
+			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
+		}
+
+		isAdmin := false
+		for _, admin := range admins {
+			if admin.User.ID == c.Sender().ID {
+				isAdmin = true
+				break
+			}
+		}
+
+		if !isAdmin {
+			log.Printf("user %d is not admin in chat %d", c.Sender().ID, chatID)
+			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "OnlyAdminsCanRegisterWebhook"}}))
+		}
+	}
+
+	if !utils.IsValidURL(webhookUrl) {
+		log.Println("invalid webhook URL:", webhookUrl)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidWebhookURL"}}))
+	}
+
+	testMessage := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "WebhookTestSendPrivateMessage",
+		},
+	})
+
+	var tmpMsg *telebot.Message
+	if tmpMsg, err = t.Bot.Send(c.Sender(), testMessage); err != nil {
+		log.Println("failed to send test message to webhook:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
+	}
+
+	// delete test message
+	if err = t.Bot.Delete(tmpMsg); err != nil {
+		log.Println("failed to delete test message:", err)
+	}
+
+	log.Printf("Registering webhook %s with secret %s in chat %d", webhookUrl, secret, chatID)
+
+	var webhookID *int64
+	if webhookID, err = t.DB.InsertWebhook(chatID, webhookUrl, secret); err != nil {
+		log.Println("failed to register webhook:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
+	}
+
+	messageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "WebhookRegistered",
+		},
+		TemplateData: map[string]string{
+			"WebhookUrl": webhookUrl,
+		},
+	})
+
+	btn := telebot.InlineButton{
+		Text:   "Unregister",
+		Unique: string(models.Unregister),
+		Data:   fmt.Sprintf("%d", *webhookID),
+	}
+
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{}
+	markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
+
+	privateMessage := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "WebhookSecret",
+		},
+		TemplateData: map[string]string{
+			"Secret":     secret,
+			"WebhookUrl": webhookUrl,
+			"ChatName":   chatName,
+		},
+	})
+
+	if _, err = t.Bot.Send(c.Sender(), privateMessage, markup); err != nil {
+		log.Println("failed to send private message with webhook secret:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
+	}
+
+	return c.Reply(messageT)
+}
+
 func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 	var event *models.Event
 	var err error
@@ -729,6 +852,44 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 		}
 
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateMessageEvent"}}))
+	}
+
+	return nil
+}
+
+func (t Telegram) CallbackUnregisterWebhook(c telebot.Context) error {
+	var err error
+
+	data := c.Callback().Data
+	parts := strings.Split(data, "|")
+	if len(parts) != 2 {
+		log.Println("Invalid data:", data)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
+	}
+
+	// parse to int64
+	webhookID, err2 := strconv.ParseInt(parts[1], 10, 64)
+	if err2 != nil {
+		log.Println("Invalid webhook id:", parts[1])
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUnregisterWebhook"}}))
+	}
+
+	userID := c.Sender().ID
+	userName := DefineUsername(c.Sender())
+	log.Printf("User %s (%d) clicked to unregister a webhook.", userName, userID)
+
+	if err = t.DB.RemoveWebhook(webhookID); err != nil {
+		log.Println("failed to remove webhook:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUnregisterWebhook"}}))
+	}
+
+	messageID := c.Callback().Message.ID
+
+	if err = t.Bot.Delete(&telebot.Message{
+		ID:   messageID,
+		Chat: c.Chat(),
+	}); err != nil {
+		log.Println("failed to delete webhook message:", err)
 	}
 
 	return nil

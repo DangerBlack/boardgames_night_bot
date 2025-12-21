@@ -81,6 +81,13 @@ func (d *Database) CreateTables() {
 			FOREIGN KEY(boardgame_id) REFERENCES boardgames(id) ON DELETE CASCADE,
 			UNIQUE(event_id, user_id) ON CONFLICT REPLACE
 		);`,
+		`CREATE TABLE IF NOT EXISTS webhooks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			chat_id INTEGER NOT NULL,
+			url TEXT  NOT NULL,
+			secret TEXT  NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
 	}
 
 	for _, query := range queries {
@@ -532,6 +539,36 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	}
 
 	return language
+}
+
+func (d *Database) InsertWebhook(chatID int64, url, secret string) (*int64, error) {
+	query := `INSERT INTO webhooks (chat_id, url, secret) VALUES (@chat_id, @url, @secret) RETURNING id;`
+	var id int64
+	if err := d.db.QueryRow(query,
+		NamedArgs(map[string]any{
+			"chat_id": chatID,
+			"url":     url,
+			"secret":  secret,
+		})...,
+	).Scan(&id); err != nil {
+		return nil, err
+	}
+
+	return &id, nil
+}
+
+func (d *Database) RemoveWebhook(webhookID int64) error {
+	query := `DELETE FROM webhooks WHERE id = @id;`
+
+	if _, err := d.db.Exec(query,
+		NamedArgs(map[string]any{
+			"id": webhookID,
+		})...,
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Database) addColumnIfNotExists(table, column, columnType string) error {

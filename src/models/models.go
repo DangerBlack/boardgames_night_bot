@@ -72,8 +72,9 @@ type Participant struct {
 type EventAction string
 
 const (
-	AddPlayer EventAction = "$add_player"
-	Cancel    EventAction = "$cancel"
+	AddPlayer  EventAction = "$add_player"
+	Cancel     EventAction = "$cancel"
+	Unregister EventAction = "$unregister"
 )
 
 type WebUrl struct {
