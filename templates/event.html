@@ -205,7 +205,7 @@
                 <input type="text" id="gameNameInput" name="name" placeholder="{{ .GameName }}*" required title="Enter the game name" alt="Enter the game name" autocomplete="off">
                 <div id="autocomplete-list" class="autocomplete-items" style="position:relative;z-index:10;"></div>
                 <input type="text" id="bggUrlInput" name="bgg_url" placeholder="BGG URL">
-                <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}" value="">
+                <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
                 <input type="text" name="user_id" placeholder="Your username" id="userID" required hidden>
                 <button type="submit">{{ .AddGame }}</button>
             </form>
