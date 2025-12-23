@@ -64,6 +64,7 @@ type HookDeleteGamePayload struct {
 	EventID   string `json:"event_id"`
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
+	UserID    int64  `json:"user_id"`
 	UserName  string `json:"user_name"`
 	DeletedAt string `json:"deleted_at"`
 }

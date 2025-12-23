@@ -115,6 +115,7 @@ When a game is deleted from an event, you will receive a POST request with the f
         "event_id": "string",
         "id": 123,
         "name": "string",
+        "user_id": 123456,
         "user_name": "string",
         "deleted_at": "YYYY-MM-DDTHH:MM:SSZ"
     }

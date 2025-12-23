@@ -4,6 +4,7 @@ import (
 	"boardgame-night-bot/src/models"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"path/filepath"
 	"sort"
@@ -322,9 +323,16 @@ func (d *Database) UpdateEventMessageID(eventID string, messageID int64) error {
 	return nil
 }
 
-func (d *Database) InsertBoardGame(eventID string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, error) {
+func (d *Database) InsertBoardGame(eventID string, id *int64, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, error) {
 	var boardGameID int64
-	query := `INSERT INTO boardgames (event_id, name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url) VALUES (@event_id, @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url) RETURNING id;`
+
+	pId := "id, "
+	pqId := "@id, "
+	if id == nil {
+		pId = ""
+		pqId = ""
+	}
+	query := fmt.Sprintf(`INSERT INTO boardgames (event_id, %s name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url) VALUES (@event_id, %s @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url) RETURNING id;`, pId, pqId)
 
 	if bggImageUrl != nil && *bggImageUrl == "" {
 		// Fix for BGG image URLs that contains a filter with mandatory (png)
@@ -337,6 +345,7 @@ func (d *Database) InsertBoardGame(eventID string, name string, maxPlayers int, 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
 			"event_id":      eventID,
+			"id":            id,
 			"name":          name,
 			"max_players":   maxPlayers,
 			"bgg_id":        bggID,

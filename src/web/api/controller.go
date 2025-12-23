@@ -5,6 +5,7 @@ import (
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,6 +29,7 @@ type Controller struct {
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
 	Hook           *hooks.WebhookClient
+	Service        *Service
 }
 
 func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string) *Controller {
@@ -41,6 +43,9 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BG
 			BotMiniAppURL: botMiniAppURL,
 		},
 		Hook: hook,
+		Service: NewService(db, bgg, bot, LanguageBundle, models.WebUrl{
+			BotMiniAppURL: botMiniAppURL,
+		}),
 	}
 }
 
@@ -61,6 +66,7 @@ func (c *Controller) InjectRoute() {
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
 	c.Router.GET("/bgg/search", c.BggSearch)
+	c.Router.POST("/chats/:chat_id/webhooks", c.ListenWebhook)
 }
 
 // BggSearch handles GET /bgg/search?name= for autocomplete
@@ -401,66 +407,10 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 	var event *models.Event
 	var game *models.BoardGame
 
-	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
-		c.renderError(ctx, nil, nil, "Invalid event ID")
+	if event, game, err = c.Service.DeleteGame(eventID, gameID, userID, username); err != nil {
+		log.Println("failed to delete game:", err)
+		c.renderError(ctx, &eventID, &event.ChatID, "Failed to delete game")
 		return
-	}
-
-	if event.Locked && event.UserID != userID {
-		log.Println("event is locked")
-		c.renderError(ctx, &event.ID, &event.ChatID, "Unable to delete game to locked event")
-		return
-	}
-
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
-	}
-
-	if game == nil {
-		c.renderError(ctx, &event.ID, &event.ChatID, "Invalid game ID")
-		return
-	}
-
-	if err = c.DB.DeleteBoardGameByID(gameID); err != nil {
-		log.Println("failed to delete board game:", err)
-		c.renderError(ctx, &event.ID, &event.ChatID, "Failed to delete board game")
-		return
-	}
-
-	to := &telebot.Chat{
-		ID: event.ChatID,
-	}
-
-	message := c.Localizer(&event.ChatID).MustLocalize(&i18n.LocalizeConfig{
-		DefaultMessage: &i18n.Message{
-			ID: "GameHasBeenDeleted",
-		},
-		TemplateData: map[string]string{
-			"Username": username,
-			"Game":     game.Name,
-			"Event":    event.Name,
-		},
-	})
-
-	options := &telebot.SendOptions{
-		ParseMode: telebot.ModeHTML,
-		ReplyTo: &telebot.Message{
-			ID: int(*event.MessageID),
-		},
-	}
-
-	log.Printf("Sending delete message to chat %d: %s", to.ID, message)
-	if _, err = c.Bot.Send(to, message, options); err != nil {
-		log.Println("failed to send message:", err)
-	}
-
-	log.Printf("Game %s deleted from event %s", game.Name, event.Name)
-	if _, err = c.updateTelegram(ctx, eventID); err != nil {
-		log.Println("failed to update telegram", err)
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Game deleted."})
@@ -471,6 +421,7 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 			ID:        game.ID,
 			EventID:   event.ID,
 			Name:      game.Name,
+			UserID:    userID,
 			UserName:  username,
 			DeletedAt: time.Now().Format("2006-01-02 15:04:05"),
 		},
@@ -486,123 +437,20 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		return
 	}
 
-	var event *models.Event
-
-	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
-		c.renderError(ctx, nil, nil, "Invalid event ID")
-		return
-	}
-
 	var bg models.AddGameRequest
 	if err = ctx.ShouldBind(&bg); err != nil {
 		log.Println("failed to bind form:", err)
-		c.renderError(ctx, &event.ID, &event.ChatID, "Invalid submitted form data")
+		c.renderError(ctx, nil, nil, "Invalid submitted form data")
 		return
 	}
 
-	if event.Locked && event.UserID != bg.UserID {
-		log.Println("event is locked")
-		c.renderError(ctx, &event.ID, &event.ChatID, "Unable to add game to locked event")
-		return
-	}
-
-	bgCtx := context.Background()
-
-	var bgID *int64
-	var bgName, bgUrl, bgImageUrl *string
-	if bg.BggUrl != nil && *bg.BggUrl != "" {
-		var valid bool
-		var id int64
-		if id, valid = models.ExtractBoardGameID(*bg.BggUrl); !valid {
-			c.renderError(ctx, &event.ID, &event.ChatID, "Invalid bgg url")
-
-			return
-		}
-
-		var bgMaxPlayers *int
-
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = models.ExtractGameInfo(bgCtx, c.BGG, id, bg.Name); err != nil {
-			log.Printf("Failed to get game %d: %v", id, err)
-		} else {
-			bgID = &id
-			if bg.MaxPlayers == nil || *bg.MaxPlayers == 0 {
-				bg.MaxPlayers = bgMaxPlayers
-			}
-		}
-	} else {
-		log.Printf("Searching for game %s", bg.Name)
-		var results []gobgg.SearchResult
-
-		if results, err = c.BGG.Search(bgCtx, bg.Name); err != nil {
-			log.Printf("Failed to search game %s: %v", bg.Name, err)
-		}
-
-		if len(results) == 0 {
-			log.Printf("Game %s not found", bg.Name)
-		} else {
-			sort.Slice(results, func(i, j int) bool {
-				return results[i].ID < results[j].ID
-			})
-
-			url := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", results[0].ID)
-			bgUrl = &url
-			if results[0].Name != "" {
-				bgName = &results[0].Name
-			}
-
-			bgID = &results[0].ID
-
-			log.Printf("Game %s id %d found: %s", bg.Name, *bgID, *bgUrl)
-
-			var things []gobgg.ThingResult
-
-			if things, err = c.BGG.GetThings(bgCtx, gobgg.GetThingIDs(*bgID)); err != nil {
-				log.Printf("Failed to get game %s: %v", bg.Name, err)
-			}
-
-			if len(things) > 0 {
-				log.Printf("Game details of %s found", bg.Name)
-				if things[0].MaxPlayers > 0 && bg.MaxPlayers == nil {
-					bg.MaxPlayers = &things[0].MaxPlayers
-				}
-
-				if things[0].Name != "" {
-					bgName = &things[0].Name
-				} else {
-					bgName = &bg.Name
-				}
-				if things[0].Image != "" {
-					bgImageUrl = &things[0].Image
-				}
-			}
-		}
-	}
-
-	if bg.MaxPlayers == nil {
-		defaultMax := 5
-		bg.MaxPlayers = &defaultMax
-	}
-
-	log.Printf("Inserting %s in the db", bg.Name)
-
-	var boardGameID int64
-	if boardGameID, err = c.DB.InsertBoardGame(event.ID, bg.Name, *bg.MaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
-		log.Println("failed to insert board game:", err)
-		c.renderError(ctx, &event.ID, &event.ChatID, "Failed to insert board game")
-		return
-	}
-
-	if event, err = c.updateTelegram(ctx, eventID); err != nil {
-		log.Println("failed to update telegram", err)
-	}
-
+	var event *models.Event
 	var game *models.BoardGame
-	for _, g := range event.BoardGames {
-		if g.Name == bg.Name {
-			game = &g
-			break
-		}
+
+	if event, game, err = c.Service.CreateGame(eventID, nil, bg.UserID, bg.Name, bg.MaxPlayers, bg.BggUrl); err != nil {
+		log.Println("failed to add game:", err)
+		c.renderError(ctx, &eventID, &event.ChatID, "Failed to add game")
+		return
 	}
 
 	localizer := c.Localizer(&event.ChatID)
@@ -628,7 +476,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeNewGame,
 		Data: models.HookNewGamePayload{
-			ID:         boardGameID,
+			ID:         game.ID,
 			EventID:    event.ID,
 			UserID:     event.UserID,
 			UserName:   event.UserName,
@@ -636,10 +484,10 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 			MaxPlayers: *bg.MaxPlayers,
 			MessageID:  nil,
 			BGG: models.HookBGGInfo{
-				IsSet:    bgID != nil,
-				ID:       bgID,
-				Name:     bgName,
-				URL:      bgUrl,
+				IsSet:    game.BggID != nil,
+				ID:       game.BggID,
+				Name:     game.BggName,
+				URL:      game.BggUrl,
 				ImageURL: game.BggImageUrl,
 			},
 			CreatedAt: time.Now(),
@@ -732,4 +580,73 @@ func (c *Controller) updateTelegram(ctx *gin.Context, eventID string) (*models.E
 	}
 
 	return event, nil
+}
+
+func (c *Controller) ListenWebhook(ctx *gin.Context) {
+	chatIDStr := ctx.Param("chat_id")
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		return
+	}
+
+	var webhookEnvelope models.HookWebhookEnvelope
+	if err = ctx.ShouldBindJSON(&webhookEnvelope); err != nil {
+		log.Println("failed to bind webhook json:", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+		return
+	}
+
+	log.Printf("Received webhook for chat %d: %v", chatID, webhookEnvelope)
+
+	switch webhookEnvelope.Type {
+	case models.HookWebhookTypeNewGame:
+		var payload *models.HookNewGamePayload
+		if payload, err = Cast[models.HookNewGamePayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing new game webhook: %+v", payload)
+		if _, _, err = c.Service.CreateGame(payload.EventID, &payload.ID, payload.UserID, payload.Name, &payload.MaxPlayers, payload.BGG.URL); err != nil {
+			log.Println("failed to add game from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add game"})
+			return
+		}
+	case models.HookWebhookTypeDeleteGame:
+		var payload *models.HookDeleteGamePayload
+		if payload, err = Cast[models.HookDeleteGamePayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing delete game webhook: %+v", payload)
+
+		if _, _, err = c.Service.DeleteGame(payload.EventID, payload.ID, payload.UserID, payload.UserName); err != nil {
+			log.Println("failed to delete game from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to delete game"})
+			return
+		}
+
+	default:
+		log.Printf("Unhandled webhook type: %s", webhookEnvelope.Type)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unhandled webhook type"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Webhook received."})
+}
+
+func Cast[T any](data any) (*T, error) {
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		log.Println("failed to marshal new game payload:", err)
+		return nil, err
+	}
+	var payload T
+	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
+		log.Println("failed to unmarshal new game payload:", err)
+		return nil, err
+	}
+	return &payload, nil
 }
