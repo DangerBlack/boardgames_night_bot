@@ -121,6 +121,33 @@ When a game is deleted from an event, you will receive a POST request with the f
 }
 ```
 
+### Update Game
+
+When an already existing game is updated, you will receive a POST request with the following JSON body:
+
+```json
+{
+    "type": "update_game",
+    "data": {
+        "id": 123,
+        "event_id": "string",
+        "user_id": 123456,
+        "user_name": "string",
+        "name": "string",
+        "max_players": 5,
+        "message_id": 123456, // nullable
+        "bgg": {
+            "is_set": true,
+            "id": 12345, // nullable
+            "name": "string", // nullable
+            "url": "string", // nullable
+            "image_url": "string" // nullable
+        },
+        "updated_at": "YYYY-MM-DDTHH:MM:SSZ"
+    }
+}
+```
+
 ### Add Participant
 
 When a participant is added to a game, you will receive a POST request with the following JSON body:

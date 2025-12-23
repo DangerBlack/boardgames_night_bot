@@ -489,7 +489,9 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 
 	log.Printf("Updating game message id: %d with number of players: %d", messageID, maxPlayers)
 
-	if err = t.DB.UpdateBoardGamePlayerNumber(int64(messageID), int(maxPlayers)); err != nil {
+	var gameID int64
+	var gameName string
+	if gameID, gameName, err = t.DB.UpdateBoardGamePlayerNumber(int64(messageID), int(maxPlayers)); err != nil {
 		if errors.Is(err, database.ErrNoRows) {
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
 		}
@@ -530,6 +532,35 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 		return c.Reply(failedT)
 	}
 
+	var game *models.BoardGame
+	for _, g := range event.BoardGames {
+		if g.ID == gameID {
+			game = &g
+			break
+		}
+	}
+
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HooksWebhookTypeUpdateGame,
+		Data: models.HookUpdateGamePayload{
+			ID:         gameID,
+			EventID:    event.ID,
+			UserID:     c.Sender().ID,
+			UserName:   c.Sender().Username,
+			Name:       gameName,
+			MaxPlayers: int(maxPlayers),
+			MessageID:  utils.IntToPointer(messageID),
+			BGG: models.HookBGGInfo{
+				IsSet:    game.BggID != nil,
+				ID:       game.BggID,
+				Name:     game.BggName,
+				URL:      game.BggUrl,
+				ImageURL: game.BggImageUrl,
+			},
+			UpdatedAt: time.Now(),
+		},
+	})
+
 	return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameUpdated"}}))
 }
 
@@ -556,7 +587,9 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 
 	log.Printf("Updating game message id: %d with number of players: %d", messageID, maxPlayers)
 
-	if err = t.DB.UpdateBoardGameBGGInfo(int64(messageID), *maxPlayers, &id, bgName, bgUrl, bgImageUrl); err != nil {
+	var gameID int64
+	var gameName string
+	if gameID, gameName, err = t.DB.UpdateBoardGameBGGInfo(int64(messageID), *maxPlayers, &id, bgName, bgUrl, bgImageUrl); err != nil {
 		if errors.Is(err, database.ErrNoRows) {
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
 		}
@@ -591,6 +624,27 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateMessageEvent"}}))
 	}
+
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HooksWebhookTypeUpdateGame,
+		Data: models.HookUpdateGamePayload{
+			ID:         gameID,
+			EventID:    event.ID,
+			UserID:     c.Sender().ID,
+			UserName:   c.Sender().Username,
+			Name:       gameName,
+			MaxPlayers: *maxPlayers,
+			MessageID:  nil,
+			BGG: models.HookBGGInfo{
+				IsSet:    true,
+				ID:       &id,
+				Name:     bgName,
+				URL:      bgUrl,
+				ImageURL: bgImageUrl,
+			},
+			UpdatedAt: time.Now(),
+		},
+	})
 
 	return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameUpdated"}}))
 }

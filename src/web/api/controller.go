@@ -353,6 +353,27 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 		"FailedToDeleteGame":      localizer.MustLocalizeMessage(&i18n.Message{ID: "WebFailedToDeleteGame"}),
 		"Delete":                  localizer.MustLocalizeMessage(&i18n.Message{ID: "WebDelete"}),
 	})
+
+	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HooksWebhookTypeUpdateGame,
+		Data: models.HookUpdateGamePayload{
+			ID:         gameID,
+			EventID:    event.ID,
+			UserID:     bg.UserID,
+			UserName:   bg.UserName,
+			Name:       game.Name,
+			MaxPlayers: *bg.MaxPlayers,
+			MessageID:  nil,
+			BGG: models.HookBGGInfo{
+				IsSet:    bgID != nil,
+				ID:       bgID,
+				Name:     bgName,
+				URL:      bgUrl,
+				ImageURL: game.BggImageUrl,
+			},
+			UpdatedAt: time.Now(),
+		},
+	})
 }
 
 func (c *Controller) DeleteGame(ctx *gin.Context) {

@@ -59,6 +59,7 @@ type UpdateGameRequest struct {
 	MaxPlayers *int    `json:"max_players" form:"max_players"`
 	BggUrl     *string `json:"bgg_url" form:"bgg_url"`
 	UserID     int64   `json:"user_id" form:"user_id"`
+	UserName   string  `json:"user_name" form:"user_name"`
 	Unlink     string  `json:"unlink" form:"unlink"`
 }
 
