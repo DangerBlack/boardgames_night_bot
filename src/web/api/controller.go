@@ -2,6 +2,7 @@ package api
 
 import (
 	"boardgame-night-bot/src/database"
+	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
 	"context"
 	"fmt"
@@ -26,9 +27,10 @@ type Controller struct {
 	Bot            *telebot.Bot
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
+	Hook           *hooks.WebhookClient
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, botMiniAppURL string) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string) *Controller {
 	return &Controller{
 		Router:         router,
 		DB:             db,
@@ -38,6 +40,7 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BG
 		Url: models.WebUrl{
 			BotMiniAppURL: botMiniAppURL,
 		},
+		Hook: hook,
 	}
 }
 
@@ -440,6 +443,17 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Game deleted."})
+
+	c.Hook.SendAllWebhookAsync(ctx, event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeDeleteGame,
+		Data: models.HookDeleteGamePayload{
+			ID:        game.ID,
+			EventID:   event.ID,
+			Name:      game.Name,
+			UserName:  username,
+			DeletedAt: time.Now().Format("2006-01-02 15:04:05"),
+		},
+	})
 }
 
 func (c *Controller) AddGame(ctx *gin.Context) {
@@ -551,7 +565,8 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 
 	log.Printf("Inserting %s in the db", bg.Name)
 
-	if _, err = c.DB.InsertBoardGame(event.ID, bg.Name, *bg.MaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
+	var boardGameID int64
+	if boardGameID, err = c.DB.InsertBoardGame(event.ID, bg.Name, *bg.MaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
 		log.Println("failed to insert board game:", err)
 		c.renderError(ctx, &event.ID, &event.ChatID, "Failed to insert board game")
 		return
@@ -588,6 +603,27 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		"FailedToDeleteGame":      localizer.MustLocalizeMessage(&i18n.Message{ID: "WebFailedToDeleteGame"}),
 		"Delete":                  localizer.MustLocalizeMessage(&i18n.Message{ID: "WebDelete"}),
 	})
+
+	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeNewGame,
+		Data: models.HookNewGamePayload{
+			ID:         boardGameID,
+			EventID:    event.ID,
+			UserID:     event.UserID,
+			UserName:   event.UserName,
+			Name:       bg.Name,
+			MaxPlayers: *bg.MaxPlayers,
+			MessageID:  nil,
+			BGG: models.HookBGGInfo{
+				IsSet:    bgID != nil,
+				ID:       bgID,
+				Name:     bgName,
+				URL:      bgUrl,
+				ImageURL: game.BggImageUrl,
+			},
+			CreatedAt: time.Now(),
+		},
+	})
 }
 
 func (c *Controller) AddPlayer(ctx *gin.Context) {
@@ -606,7 +642,8 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 		return
 	}
 
-	if _, err = c.DB.InsertParticipant(eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
+	var participantID int64
+	if participantID, err = c.DB.InsertParticipant(eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
@@ -617,6 +654,24 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{"message": "Player added."})
+
+	var event *models.Event
+	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
+		log.Println("failed to load game:", err)
+		return
+	}
+
+	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeAddParticipant,
+		Data: models.HookAddParticipantPayload{
+			ID:       participantID,
+			EventID:  event.ID,
+			GameID:   addPlayer.GameID,
+			UserID:   addPlayer.UserID,
+			UserName: addPlayer.UserName,
+			AddedAt:  time.Now(),
+		},
+	})
 }
 
 func P(x string) *string {

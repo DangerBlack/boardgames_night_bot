@@ -81,6 +81,14 @@ type WebUrl struct {
 	BotMiniAppURL string
 }
 
+type Webhook struct {
+	ID        string
+	ChatID    int64
+	Url       string
+	Secret    string
+	CreatedAt time.Time
+}
+
 func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (string, telebot.InlineButton, error) {
 	msg := ""
 
