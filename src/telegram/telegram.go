@@ -208,8 +208,9 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	}
 	log.Printf("Event created with id: %s", eventID)
 
+	var counterGameID int64
 	if strings.Contains(fullText, "👥") {
-		if _, err = t.DB.InsertBoardGame(eventID, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
+		if counterGameID, err = t.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
 			log.Println("failed to add game:", err)
 			failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 			return c.Reply(failedT)
@@ -253,6 +254,25 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 			CreatedAt: time.Now(),
 		},
 	})
+
+	if counterGameID != 0 {
+		t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+			Type: models.HookWebhookTypeNewGame,
+			Data: models.HookNewGamePayload{
+				ID:         counterGameID,
+				EventID:    event.ID,
+				UserID:     userID,
+				UserName:   userName,
+				Name:       models.PLAYER_COUNTER,
+				MaxPlayers: -1,
+				MessageID:  utils.IntToPointer(responseMsg.ID),
+				BGG: models.HookBGGInfo{
+					IsSet: false,
+				},
+				CreatedAt: time.Now(),
+			},
+		})
+	}
 
 	return nil
 }
@@ -343,7 +363,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		}
 	}
 
-	if boardGameID, err = t.DB.InsertBoardGame(event.ID, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl); err != nil {
+	if boardGameID, err = t.DB.InsertBoardGame(event.ID, nil, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl); err != nil {
 		log.Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
