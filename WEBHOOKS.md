@@ -20,8 +20,23 @@ Replace `[url]` with your endpoint (must be publicly accessible).
 
 ## Security
 
-- Each webhook request includes an HMAC signature in the `X-BGNB-Signature` header.
-- Use the secret provided to verify the authenticity and integrity of the payload.
+- Each webhook request includes the following headers for authentication:
+  - `x-ms-date`: The UTC date/time of the request (RFC1123 format).
+  - `x-ms-content-sha256`: The SHA256 hash (hex-encoded) of the JSON payload.
+  - `X-BGNB-Signature`: The HMAC-SHA256 signature (base64-encoded) of the string:
+  
+    ```javascript
+    stringToSign = x-ms-date + ";" + x-ms-content-sha256
+    ```
+
+- The signature is computed as:
+
+    1. Calculate the SHA256 hash of the JSON payload and hex-encode it (for `x-ms-content-sha256`).
+    2. Get the current UTC date/time in RFC1123 format (for `x-ms-date`).
+    3. Build the string to sign: `stringToSign = x-ms-date + ";" + x-ms-content-sha256`.
+    4. Compute the HMAC-SHA256 of `stringToSign` using your webhook secret, then base64-encode the result (for `X-BGNB-Signature`).
+
+- On the receiver side, verify the signature by repeating these steps and comparing the result with the `X-BGNB-Signature` header.
 
 ## Webhook Events
 

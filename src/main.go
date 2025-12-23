@@ -2,6 +2,7 @@ package main
 
 import (
 	"boardgame-night-bot/src/database"
+	"boardgame-night-bot/src/hooks"
 	langpack "boardgame-night-bot/src/language"
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/telegram"
@@ -145,6 +146,8 @@ func main() {
 		gobgg.SetBearerToken(bggToken),
 	)
 
+	wh := hooks.NewWebhookClient(db, 5*time.Second, 3)
+
 	telegram := telegram.Telegram{
 		Bot:            bot,
 		DB:             db,
@@ -154,6 +157,7 @@ func main() {
 		Url: models.WebUrl{
 			BotMiniAppURL: botMiniAppURL,
 		},
+		Hook: wh,
 	}
 
 	log.Println("bot started")
@@ -162,7 +166,7 @@ func main() {
 
 	go func() {
 		log.Println("server started")
-		web.StartServer(port, db, bgg, bot, bundle, botMiniAppURL)
+		web.StartServer(port, db, bgg, bot, bundle, wh, botMiniAppURL)
 		log.Println("server stopped")
 	}()
 	go func() {

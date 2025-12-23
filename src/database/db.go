@@ -484,19 +484,20 @@ func (d *Database) InsertParticipant(eventID string, boardgameID, userID int64, 
 	return participantID, nil
 }
 
-func (d *Database) RemoveParticipant(eventID string, userID int64) error {
-	query := `DELETE FROM participants WHERE event_id = @event_id AND user_id = @user_id;`
-
-	if _, err := d.db.Exec(query,
+func (d *Database) RemoveParticipant(eventID string, userID int64) (int64, int64, error) {
+	query := `DELETE FROM participants WHERE event_id = @event_id AND user_id = @user_id RETURNING id, boardgame_id;`
+	var id int64
+	var boardgameID int64
+	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
 			"event_id": eventID,
 			"user_id":  userID,
 		})...,
-	); err != nil {
-		return err
+	).Scan(&id, &boardgameID); err != nil {
+		return 0, 0, err
 	}
 
-	return nil
+	return id, boardgameID, nil
 }
 
 func (d *Database) InsertChat(chatID int64, language *string, location *string) error {
@@ -569,6 +570,47 @@ func (d *Database) RemoveWebhook(webhookID int64) error {
 	}
 
 	return nil
+}
+
+func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
+	query := `SELECT id, chat_id, url, secret, created_at FROM webhooks WHERE chat_id = @chat_id;`
+
+	rows, err := d.db.Query(query,
+		NamedArgs(map[string]any{
+			"chat_id": chatID,
+		})...,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []models.Webhook{}, nil
+		}
+
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var webhooks []models.Webhook
+	for rows.Next() {
+		var webhook models.Webhook
+		if err := rows.Scan(
+			&webhook.ID,
+			&webhook.ChatID,
+			&webhook.Url,
+			&webhook.Secret,
+			&webhook.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		webhooks = append(webhooks, webhook)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return webhooks, nil
 }
 
 func (d *Database) addColumnIfNotExists(table, column, columnType string) error {

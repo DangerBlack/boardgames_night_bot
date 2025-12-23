@@ -19,3 +19,8 @@ func IsValidURL(str string) bool {
 	u, err := url.Parse(str)
 	return err == nil && u.Scheme != "" && u.Host != "" && (strings.HasPrefix(u.Scheme, "http"))
 }
+
+func IntToPointer(i int) *int64 {
+	v := int64(i)
+	return &v
+}

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"boardgame-night-bot/src/database"
+	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/language"
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/utils"
@@ -32,6 +33,7 @@ type Telegram struct {
 	LanguageBundle *i18n.Bundle
 	LanguagePack   *language.LanguagePack
 	Url            models.WebUrl
+	Hook           *hooks.WebhookClient
 }
 
 func (t Telegram) SetupHandlers() {
@@ -237,7 +239,22 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		return c.Reply(failedT)
 	}
 
-	return err
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeNewEvent,
+		Data: models.HookNewEventPayload{
+			ID:        event.ID,
+			ChatID:    event.ChatID,
+			UserID:    event.UserID,
+			UserName:  event.UserName,
+			Name:      event.Name,
+			MessageID: utils.IntToPointer(responseMsg.ID),
+			Location:  event.Location,
+			StartsAt:  event.StartsAt,
+			CreatedAt: time.Now(),
+		},
+	})
+
+	return nil
 }
 
 func (t Telegram) AddGame(c telebot.Context) error {
@@ -332,7 +349,8 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		return c.Reply(failedT)
 	}
 
-	if _, err = t.DB.InsertParticipant(event.ID, boardGameID, userID, userName); err != nil {
+	var participantID int64
+	if participantID, err = t.DB.InsertParticipant(event.ID, boardGameID, userID, userName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
@@ -399,6 +417,39 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
+
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeNewGame,
+		Data: models.HookNewGamePayload{
+			ID:         boardGameID,
+			EventID:    event.ID,
+			UserID:     userID,
+			UserName:   userName,
+			Name:       gameName,
+			MaxPlayers: maxPlayers,
+			MessageID:  utils.IntToPointer(responseMsg.ID),
+			BGG: models.HookBGGInfo{
+				IsSet:    bgID != nil,
+				ID:       bgID,
+				Name:     bgName,
+				URL:      bgUrl,
+				ImageURL: bggImageUrl,
+			},
+			CreatedAt: time.Now(),
+		},
+	})
+
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeAddParticipant,
+		Data: models.HookAddParticipantPayload{
+			ID:       participantID,
+			EventID:  event.ID,
+			GameID:   boardGameID,
+			UserID:   userID,
+			UserName: userName,
+			AddedAt:  time.Now(),
+		},
+	})
 
 	return nil
 }
@@ -771,7 +822,8 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 	userName := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to join a game.", userName, userID)
 
-	if _, err = t.DB.InsertParticipant(eventID, boardGameID, userID, userName); err != nil {
+	var participantID int64
+	if participantID, err = t.DB.InsertParticipant(eventID, boardGameID, userID, userName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddPlayer"}}))
 	}
@@ -800,6 +852,18 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateMessageEvent"}}))
 	}
 
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeAddParticipant,
+		Data: models.HookAddParticipantPayload{
+			ID:       participantID,
+			EventID:  event.ID,
+			GameID:   boardGameID,
+			UserID:   userID,
+			UserName: userName,
+			AddedAt:  time.Now(),
+		},
+	})
+
 	return nil
 }
 
@@ -825,7 +889,8 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 	userName := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to exit a game.", userName, userID)
 
-	if err = t.DB.RemoveParticipant(eventID, userID); err != nil {
+	var participantID, boardGameID int64
+	if participantID, boardGameID, err = t.DB.RemoveParticipant(eventID, userID); err != nil {
 		log.Println("failed to remove user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRemovePlayer"}}))
 	}
@@ -853,6 +918,18 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateMessageEvent"}}))
 	}
+
+	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeRemoveParticipant,
+		Data: models.HookRemoveParticipantPayload{
+			ID:        participantID,
+			EventID:   event.ID,
+			UserID:    userID,
+			GameID:    boardGameID,
+			UserName:  userName,
+			RemovedAt: time.Now(),
+		},
+	})
 
 	return nil
 }
