@@ -175,7 +175,8 @@
             <form action="/events/{{ .Id }}/games/{{ .Game.ID }}" method="POST">
                 <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
                 <input type="text" name="bgg_url" placeholder="BGG URL">
-                <input type="text" name="user_id" placeholder="Your username" id="userID" required hidden>
+                <input type="text" name="user_id" placeholder="Your id" id="userID" required hidden>
+                <input type="text" name="user_name" placeholder="Your username" id="userName" required hidden>
                 <label><input type="checkbox" name="unlink"> {{ .UnlinkFormBoardGameGeek }}</label>
                 <button type="submit">{{ .Update }}</button>
             </form>
@@ -190,6 +191,7 @@
         if(user)
         { 
             document.getElementById("userID").value = user.id;
+            document.getElementById("userName").value = username;
         }
         else {
             document.getElementById("auth").setAttribute("style", "display: none;");

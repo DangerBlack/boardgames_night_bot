@@ -366,8 +366,9 @@ func (d *Database) UpdateBoardGameMessageID(boardgameID, messageID int64) error 
 	return nil
 }
 
-func (d *Database) UpdateBoardGamePlayerNumber(messageID int64, maxPlayers int) error {
+func (d *Database) UpdateBoardGamePlayerNumber(messageID int64, maxPlayers int) (int64, string, error) {
 	var boardGameID int64
+	var name string
 
 	query := `UPDATE boardgames SET max_players = @max_players where message_id = @message_id RETURNING id;`
 
@@ -376,15 +377,16 @@ func (d *Database) UpdateBoardGamePlayerNumber(messageID int64, maxPlayers int) 
 			"max_players": maxPlayers,
 			"message_id":  messageID,
 		})...,
-	).Scan(&boardGameID); err != nil {
-		return ParseError(err)
+	).Scan(&boardGameID, &name); err != nil {
+		return 0, "", ParseError(err)
 	}
 
-	return nil
+	return boardGameID, name, nil
 }
 
-func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error {
+func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
 	var boardGameID int64
+	var name string
 
 	query := `UPDATE boardgames 
 	SET 
@@ -393,7 +395,7 @@ func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID
 	bgg_name = @bgg_name,
 	bgg_url = @bgg_url,
 	bgg_image_url = @bgg_image_url
-	WHERE message_id = @message_id RETURNING id;`
+	WHERE message_id = @message_id RETURNING id, name;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
@@ -404,11 +406,11 @@ func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID
 			"bgg_url":       bggUrl,
 			"bgg_image_url": bggImageUrl,
 		})...,
-	).Scan(&boardGameID); err != nil {
-		return ParseError(err)
+	).Scan(&boardGameID, &name); err != nil {
+		return 0, "", ParseError(err)
 	}
 
-	return nil
+	return boardGameID, name, nil
 }
 
 func (d *Database) UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error {
