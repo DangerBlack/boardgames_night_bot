@@ -53,9 +53,9 @@ When a new event is created, you will receive a POST request with the following 
         "user_id": 123456,
         "user_name": "string",
         "name": "string",
-        "message_id": 123456,
-        "location": "string",
-        "starts_at": "YYYY-MM-DDTHH:MM:SSZ",
+        "message_id": 123456, // nullable
+        "location": "string", // nullable
+        "starts_at": "YYYY-MM-DDTHH:MM:SSZ", // nullable
         "created_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
 }
@@ -87,16 +87,19 @@ When a new game is added to an event, you will receive a POST request with the f
     "data": {
         "id": 123,
         "event_id": "string",
+        "user_id": 123456,
+        "user_name": "string",
         "name": "string",
         "max_players": 5,
-        "message_id": 123456,
+        "message_id": 123456, // nullable
         "bgg": {
             "is_set": true,
-            "id": 12345,
-            "name": "string",
-            "url": "string",
-            "image_url": "string"
-        }
+            "id": 12345, // nullable
+            "name": "string", // nullable
+            "url": "string", // nullable
+            "image_url": "string" // nullable
+        },
+        "created_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
 }
 ```
@@ -130,7 +133,8 @@ When a participant is added to a game, you will receive a POST request with the 
         "game_id": 123,
         "id": 456,
         "user_id": 789,
-        "user_name": "string"
+        "user_name": "string",
+        "added_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
 }
 ```
@@ -147,7 +151,8 @@ When a participant is removed from a game, you will receive a POST request with 
         "game_id": 123,
         "id": 456,
         "user_id": 789,
-        "user_name": "string"
+        "user_name": "string",
+        "removed_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
 }
 ```
