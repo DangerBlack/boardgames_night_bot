@@ -570,6 +570,17 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
+		reqTime, err := time.Parse(time.RFC1123, date)
+		if err != nil {
+			ctx.AbortWithStatusJSON(400, gin.H{"error": "invalid date"})
+			return
+		}
+
+		if time.Since(reqTime) > 5*time.Minute {
+			ctx.AbortWithStatusJSON(401, gin.H{"error": "request too old"})
+			return
+		}
+
 		ctx.Set("chat_id", webhook.ChatID)
 		ctx.Set("thread_id", webhook.ThreadID)
 
