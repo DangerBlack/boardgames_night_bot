@@ -88,6 +88,7 @@ type Webhook struct {
 	ID        string
 	UUID      string
 	ChatID    int64
+	ThreadID  *int64
 	Url       string
 	Secret    string
 	CreatedAt time.Time
