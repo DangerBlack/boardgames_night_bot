@@ -201,7 +201,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	var eventID string
 	log.Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
 
-	if eventID, err = t.DB.InsertEvent(chatID, userID, userName, eventName, nil, location, startsAt); err != nil {
+	if eventID, err = t.DB.InsertEvent(nil, chatID, userID, userName, eventName, nil, location, startsAt); err != nil {
 		log.Println("failed to create event:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToCreateEvent"}})
 		return c.Reply(failedT)

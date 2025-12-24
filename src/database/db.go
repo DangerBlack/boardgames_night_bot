@@ -193,7 +193,7 @@ func (d *Database) Close() {
 	log.Println("database connection closed")
 }
 
-func (d *Database) InsertEvent(chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
+func (d *Database) InsertEvent(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
 	var eventID string
 	query := `INSERT INTO events 
 	(id, chat_id, user_id, user_name, name, message_id, location, starts_at) 
@@ -213,9 +213,15 @@ func (d *Database) InsertEvent(chatID, userID int64, userName, name string, mess
 	) 
 	RETURNING id;`
 
+	if id != nil {
+		eventID = *id
+	} else {
+		eventID = uuid.New().String()
+	}
+
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
-			"event_id":   uuid.New().String(),
+			"event_id":   eventID,
 			"chat_id":    chatID,
 			"user_id":    userID,
 			"user_name":  userName,
