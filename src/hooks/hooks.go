@@ -84,7 +84,7 @@ func (wc *WebhookClient) sendWebhook(ctx context.Context, url string, payload mo
 	stringToSign := fmt.Sprintf("%s;%s", date, contentHash)
 
 	// Compute HMAC signature (base64-encoded)
-	signature := computeHMACBase64(stringToSign, []byte(secret))
+	signature := ComputeHMACBase64(stringToSign, []byte(secret))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
@@ -107,8 +107,8 @@ func (wc *WebhookClient) sendWebhook(ctx context.Context, url string, payload mo
 	return nil
 }
 
-// computeHMACBase64 generates the HMAC SHA256 signature for the stringToSign and encodes it in base64.
-func computeHMACBase64(stringToSign string, secret []byte) string {
+// ComputeHMACBase64 generates the HMAC SHA256 signature for the stringToSign and encodes it in base64.
+func ComputeHMACBase64(stringToSign string, secret []byte) string {
 	h := hmac.New(sha256.New, secret)
 	h.Write([]byte(stringToSign))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))

@@ -734,6 +734,29 @@ func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
 	return webhooks, nil
 }
 
+func (d *Database) GetWebhookByWebhookID(webhookID string) (*models.Webhook, error) {
+	query := `SELECT id, uuid, chat_id, thread_id, url, secret, created_at FROM webhooks WHERE uuid = @uuid;`
+
+	var webhook models.Webhook
+	if err := d.db.QueryRow(query,
+		NamedArgs(map[string]any{
+			"uuid": webhookID,
+		})...,
+	).Scan(
+		&webhook.ID,
+		&webhook.UUID,
+		&webhook.ChatID,
+		&webhook.ThreadID,
+		&webhook.Url,
+		&webhook.Secret,
+		&webhook.CreatedAt,
+	); err != nil {
+		return nil, ParseError(err)
+	}
+
+	return &webhook, nil
+}
+
 func (d *Database) addColumnIfNotExists(table, column, columnType string) (bool, error) {
 	query := `
 		SELECT 1

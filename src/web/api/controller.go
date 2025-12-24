@@ -5,9 +5,14 @@ import (
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/utils"
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sort"
@@ -67,7 +72,7 @@ func (c *Controller) InjectRoute() {
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
 	c.Router.GET("/bgg/search", c.BggSearch)
-	c.Router.POST("/chats/:chat_id/webhooks", c.ListenWebhook)
+	c.Router.POST("/chats/:webhook_id/webhooks", c.VerifyWebhook(), c.ListenWebhook)
 }
 
 // BggSearch handles GET /bgg/search?name= for autocomplete
@@ -517,13 +522,65 @@ func (c *Controller) updateTelegram(ctx *gin.Context, eventID string) (*models.E
 	return event, nil
 }
 
-func (c *Controller) ListenWebhook(ctx *gin.Context) {
-	chatIDStr := ctx.Param("chat_id")
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
-		return
+func (c *Controller) VerifyWebhook() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		webhookID := ctx.Param("webhook_id")
+
+		webhook, err := c.DB.GetWebhookByWebhookID(webhookID)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+			return
+		}
+
+		body, err := ctx.GetRawData()
+		if err != nil {
+			ctx.AbortWithStatusJSON(400, gin.H{"error": "invalid body"})
+			return
+		}
+
+		ctx.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+
+		date := ctx.GetHeader("x-ms-date")
+		if date == "" {
+			ctx.AbortWithStatusJSON(400, gin.H{"error": "missing date"})
+			return
+		}
+
+		contentHash := sha256.Sum256(body)
+		contentHashHex := hex.EncodeToString(contentHash[:])
+
+		if ctx.GetHeader("x-ms-content-sha256") != contentHashHex {
+			ctx.AbortWithStatusJSON(400, gin.H{"error": "hash mismatch"})
+			return
+		}
+
+		stringToSign := fmt.Sprintf("%s;%s", date, contentHashHex)
+
+		expectedSig := hooks.ComputeHMACBase64(stringToSign, []byte(webhook.Secret))
+
+		clientSig := ctx.GetHeader("X-BGNB-Signature")
+		if clientSig == "" {
+			ctx.AbortWithStatusJSON(401, gin.H{"error": "missing signature"})
+			return
+
+		}
+
+		if !hmac.Equal([]byte(expectedSig), []byte(clientSig)) {
+			ctx.AbortWithStatusJSON(401, gin.H{"error": "invalid signature"})
+			return
+		}
+
+		ctx.Set("chat_id", webhook.ChatID)
+		ctx.Set("thread_id", webhook.ThreadID)
+
+		ctx.Next()
 	}
+}
+
+func (c *Controller) ListenWebhook(ctx *gin.Context) {
+	var err error
+	chatID := ctx.GetInt64("chat_id")
+	// threadID := ctx.GetInt64("thread_id")
 
 	var webhookEnvelope models.HookWebhookEnvelope
 	if err = ctx.ShouldBindJSON(&webhookEnvelope); err != nil {
