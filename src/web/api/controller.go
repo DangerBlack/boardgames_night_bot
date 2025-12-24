@@ -38,7 +38,7 @@ type Controller struct {
 	Service        *Service
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseUrl string) *Controller {
 	return &Controller{
 		Router:         router,
 		DB:             db,
@@ -46,6 +46,7 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BG
 		Bot:            bot,
 		LanguageBundle: LanguageBundle,
 		Url: models.WebUrl{
+			BaseUrl:       baseUrl,
 			BotMiniAppURL: botMiniAppURL,
 		},
 		Hook: hook,
@@ -72,7 +73,7 @@ func (c *Controller) InjectRoute() {
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
 	c.Router.GET("/bgg/search", c.BggSearch)
-	c.Router.POST("/chats/:webhook_id/webhooks", c.VerifyWebhook(), c.ListenWebhook)
+	c.Router.POST("/webhooks/:webhook_id", c.VerifyWebhook(), c.ListenWebhook)
 }
 
 // BggSearch handles GET /bgg/search?name= for autocomplete

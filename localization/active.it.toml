@@ -64,6 +64,8 @@ WebhookSecret = """Webhook creato per la chat <b>{{.ChatName}}</b>!
 <code>{{.Secret}}</code>
 🌐 <b>Webhook:</b> 
 <code>{{.WebhookUrl}}</code>
+🔗 <b>Puoi inviare richieste firmate a questo URL:</b>
+<code>{{.CallbackUrl}}</code>
 
 Conserva questo segreto in un luogo sicuro. Usalo per validare la firma HMAC delle richieste ricevute."""
 OnlyAdminsCanRegisterWebhook = "Solo gli amministratori della chat possono registrare un webhook."

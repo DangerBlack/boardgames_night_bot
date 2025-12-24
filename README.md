@@ -23,6 +23,7 @@ To install the Boardgame Night Bot, follow these steps:
     ```
     TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     HEALTH_CHECK_URL=https://hc-ping.com/xxxxxxxxxxxxxxxxxxx
+    BASE_URL=https://yourdomain.example
     BOT_NAME=name_of_your_bot
     BOT_MINI_APP_URL=https://t.me/botname/miniapp_name
     PORT=8080
@@ -81,6 +82,7 @@ services:
     environment:
       - TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       - HEALTH_CHECK_URL=https://hc-ping.com/xxxxxxxxxxxxxxxxxxx
+      - BASE_URL=https://yourdomain.example
       - BOT_MINI_APP_URL=https://t.me/name_of_your_bot/home
       - BOT_NAME=name_of_your_bot 
       - DB_PATH=/archive

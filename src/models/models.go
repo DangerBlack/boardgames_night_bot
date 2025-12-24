@@ -81,6 +81,7 @@ const (
 )
 
 type WebUrl struct {
+	BaseUrl       string
 	BotMiniAppURL string
 }
 
