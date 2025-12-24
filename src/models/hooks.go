@@ -8,7 +8,7 @@ const (
 	HookWebhookTypeNewEvent          HookWebhookType = "new_event"
 	HookWebhookTypeDeleteEvent       HookWebhookType = "delete_event"
 	HookWebhookTypeNewGame           HookWebhookType = "new_game"
-	HooksWebhookTypeUpdateGame       HookWebhookType = "update_game"
+	HookWebhookTypeUpdateGame        HookWebhookType = "update_game"
 	HookWebhookTypeDeleteGame        HookWebhookType = "delete_game"
 	HookWebhookTypeAddParticipant    HookWebhookType = "add_participant"
 	HookWebhookTypeRemoveParticipant HookWebhookType = "remove_participant"

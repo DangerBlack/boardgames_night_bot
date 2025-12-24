@@ -556,7 +556,7 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 	game := utils.PickGame(event, gameID)
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
-		Type: models.HooksWebhookTypeUpdateGame,
+		Type: models.HookWebhookTypeUpdateGame,
 		Data: models.HookUpdateGamePayload{
 			ID:         game.UUID,
 			EventID:    event.ID,
@@ -641,7 +641,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 	}
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
-		Type: models.HooksWebhookTypeUpdateGame,
+		Type: models.HookWebhookTypeUpdateGame,
 		Data: models.HookUpdateGamePayload{
 			ID:         gameID,
 			EventID:    event.ID,

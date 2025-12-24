@@ -291,7 +291,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 	})
 
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
-		Type: models.HooksWebhookTypeUpdateGame,
+		Type: models.HookWebhookTypeUpdateGame,
 		Data: models.HookUpdateGamePayload{
 			ID:         game.UUID,
 			EventID:    event.ID,
@@ -562,7 +562,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to delete game"})
 			return
 		}
-	case models.HooksWebhookTypeUpdateGame:
+	case models.HookWebhookTypeUpdateGame:
 		var payload *models.HookUpdateGamePayload
 		if payload, err = Cast[models.HookUpdateGamePayload](webhookEnvelope.Data); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
