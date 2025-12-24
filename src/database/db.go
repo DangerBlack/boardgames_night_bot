@@ -87,6 +87,7 @@ func (d *Database) CreateTables() {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			uuid TEXT UNIQUE,
 			chat_id INTEGER NOT NULL,
+			thread_id INTEGER,
 			url TEXT  NOT NULL,
 			secret TEXT  NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -658,15 +659,16 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	return language
 }
 
-func (d *Database) InsertWebhook(chatID int64, url, secret string) (*int64, error) {
-	query := `INSERT INTO webhooks (uuid, chat_id, url, secret) VALUES (@uuid, @chat_id, @url, @secret) RETURNING id;`
+func (d *Database) InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, error) {
+	query := `INSERT INTO webhooks (uuid, chat_id, thread_id, url, secret) VALUES (@uuid, @chat_id, @thread_id, @url, @secret) RETURNING id;`
 	var id int64
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
-			"uuid":    uuid.New().String(),
-			"chat_id": chatID,
-			"url":     url,
-			"secret":  secret,
+			"uuid":      uuid.New().String(),
+			"chat_id":   chatID,
+			"thread_id": threadID,
+			"url":       url,
+			"secret":    secret,
 		})...,
 	).Scan(&id); err != nil {
 		return nil, err
@@ -690,7 +692,7 @@ func (d *Database) RemoveWebhook(webhookID int64) error {
 }
 
 func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
-	query := `SELECT id, uuid, chat_id, url, secret, created_at FROM webhooks WHERE chat_id = @chat_id;`
+	query := `SELECT id, uuid, chat_id, thread_id, url, secret, created_at FROM webhooks WHERE chat_id = @chat_id;`
 
 	rows, err := d.db.Query(query,
 		NamedArgs(map[string]any{
@@ -714,6 +716,7 @@ func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
 			&webhook.ID,
 			&webhook.UUID,
 			&webhook.ChatID,
+			&webhook.ThreadID,
 			&webhook.Url,
 			&webhook.Secret,
 			&webhook.CreatedAt,

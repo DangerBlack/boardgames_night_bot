@@ -824,8 +824,15 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 
 	log.Printf("Registering webhook %s with secret %s in chat %d", webhookUrl, secret, chatID)
 
+	threadIDx := c.Message().ThreadID
+
+	var threadID *int64
+	if threadIDx != 0 {
+		threadID = utils.IntToPointer(threadIDx)
+	}
+
 	var webhookID *int64
-	if webhookID, err = t.DB.InsertWebhook(chatID, webhookUrl, secret); err != nil {
+	if webhookID, err = t.DB.InsertWebhook(chatID, threadID, webhookUrl, secret); err != nil {
 		log.Println("failed to register webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
