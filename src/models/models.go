@@ -39,6 +39,7 @@ type AddPlayerRequest struct {
 
 type BoardGame struct {
 	ID           int64         `json:"id"`
+	UUID         string        `json:"uuid"`
 	Name         string        `json:"name"`
 	MaxPlayers   int64         `json:"max_players"`
 	Participants []Participant `json:"participants"`
@@ -65,6 +66,7 @@ type UpdateGameRequest struct {
 
 type Participant struct {
 	ID       int64  `json:"id"`
+	UUID     string `json:"uuid"`
 	UserID   int64  `json:"user_id"`
 	UserName string `json:"user_name"`
 }
@@ -84,6 +86,7 @@ type WebUrl struct {
 
 type Webhook struct {
 	ID        string
+	UUID      string
 	ChatID    int64
 	Url       string
 	Secret    string
