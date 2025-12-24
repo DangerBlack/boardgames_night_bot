@@ -157,9 +157,71 @@ func (s *Service) CreateGame(
 	return event, game, nil
 }
 
-func (s *Service) UpdateGame( /* params */ ) error {
-	// ...implementation
-	return nil
+func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg models.UpdateGameRequest) (*models.Event, *models.BoardGame, error) {
+	var err error
+	var event *models.Event
+	var game *models.BoardGame
+
+	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
+		log.Println("failed to load game:", err)
+		return nil, nil, errors.New("invalid event ID")
+	}
+
+	if event.Locked && event.UserID != userID {
+		log.Println("event is locked")
+		return nil, nil, errors.New("unable to add game to locked event")
+	}
+
+	game = utils.PickGame(event, gameID)
+
+	maxPlayers := int(game.MaxPlayers)
+	if bg.MaxPlayers != nil && *bg.MaxPlayers >= 0 {
+		maxPlayers = *bg.MaxPlayers
+	}
+
+	bgCtx := context.Background()
+
+	bgID := game.BggID
+	bgName := game.BggName
+	bgUrl := game.BggUrl
+	bgImageUrl := game.BggImageUrl
+	if bg.Unlink == "on" {
+		bgID = nil
+		bgName = nil
+		bgUrl = nil
+		bgImageUrl = nil
+	}
+
+	if bg.BggUrl != nil && *bg.BggUrl != "" {
+		var valid bool
+		var id int64
+		if id, valid = models.ExtractBoardGameID(*bg.BggUrl); !valid {
+			return nil, nil, errors.New("invalid bgg url")
+		}
+
+		var bgMaxPlayers *int
+
+		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = models.ExtractGameInfo(bgCtx, s.BGG, id, game.Name); err != nil {
+			log.Printf("Failed to get game %d: %v", id, err)
+		}
+		if bgMaxPlayers != nil {
+			maxPlayers = int(*bgMaxPlayers)
+		}
+	}
+
+	if err = s.DB.UpdateBoardGameBGGInfoByID(gameID, maxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
+		log.Println("failed to update board game:", err)
+		return nil, nil, errors.New("failed to update board game")
+	}
+
+	if event, err = s.updateTelegram(eventID); err != nil {
+		log.Println("failed to update telegram", err)
+		return nil, nil, err
+	}
+
+	game = utils.PickGame(event, gameID)
+
+	return event, game, nil
 }
 
 func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, username string) (*models.Event, *models.BoardGame, error) {
@@ -224,13 +286,34 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 	return event, game, nil
 }
 
-func (s *Service) AddPlayer( /* params */ ) error {
-	// ...implementation
-	return nil
+func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string) (string, error) {
+	var err error
+	var participantID string
+	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username); err != nil {
+		log.Println("failed to add user to participants table:", err)
+		return "", errors.New("invalid form data")
+	}
+
+	if _, err = s.updateTelegram(eventID); err != nil {
+		log.Println("failed to update telegram", err)
+		return "", err
+	}
+
+	return participantID, nil
 }
 
-func (s *Service) DeletePlayer( /* params */ ) error {
-	// ...implementation
+func (s *Service) DeletePlayer(eventID string, userID int64) error {
+	var err error
+	if _, _, err = s.DB.RemoveParticipant(eventID, userID); err != nil {
+		log.Println("failed to remove participant from webhook:", err)
+		return errors.New("failed to remove participant")
+	}
+
+	if _, err = s.updateTelegram(eventID); err != nil {
+		log.Println("failed to update telegram", err)
+		return err
+	}
+
 	return nil
 }
 
