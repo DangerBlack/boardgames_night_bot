@@ -261,76 +261,10 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 	var event *models.Event
 	var game *models.BoardGame
 
-	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
-		c.renderError(ctx, nil, nil, "Invalid event ID")
+	if event, game, err = c.Service.UpdateGame(eventID, gameID, bg.UserID, bg); err != nil {
+		log.Println("failed to update game:", err)
+		c.renderError(ctx, &eventID, &event.ChatID, "Failed to update game")
 		return
-	}
-
-	if event.Locked && event.UserID != bg.UserID {
-		log.Println("event is locked")
-		c.renderError(ctx, &event.ID, &event.ChatID, "Unable to add game to locked event")
-		return
-	}
-
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
-	}
-
-	maxPlayers := int(game.MaxPlayers)
-	if bg.MaxPlayers != nil && *bg.MaxPlayers >= 0 {
-		maxPlayers = *bg.MaxPlayers
-	}
-
-	bgCtx := context.Background()
-
-	bgID := game.BggID
-	bgName := game.BggName
-	bgUrl := game.BggUrl
-	bgImageUrl := game.BggImageUrl
-	if bg.Unlink == "on" {
-		bgID = nil
-		bgName = nil
-		bgUrl = nil
-		bgImageUrl = nil
-	}
-
-	if bg.BggUrl != nil && *bg.BggUrl != "" {
-		var valid bool
-		var id int64
-		if id, valid = models.ExtractBoardGameID(*bg.BggUrl); !valid {
-			c.renderError(ctx, &eventID, &event.ChatID, "Invalid bgg url")
-			return
-		}
-
-		var bgMaxPlayers *int
-
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = models.ExtractGameInfo(bgCtx, c.BGG, id, game.Name); err != nil {
-			log.Printf("Failed to get game %d: %v", id, err)
-		}
-		if bgMaxPlayers != nil {
-			maxPlayers = int(*bgMaxPlayers)
-		}
-	}
-
-	if err = c.DB.UpdateBoardGameBGGInfoByID(gameID, maxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
-		log.Println("failed to update board game:", err)
-		c.renderError(ctx, &eventID, &event.ChatID, "Failed to update board game")
-		return
-	}
-
-	if event, err = c.updateTelegram(ctx, eventID); err != nil {
-		log.Println("failed to update telegram", err)
-	}
-
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
 	}
 
 	localizer := c.Localizer(&event.ChatID)
@@ -367,10 +301,10 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 			MaxPlayers: *bg.MaxPlayers,
 			MessageID:  nil,
 			BGG: models.HookBGGInfo{
-				IsSet:    bgID != nil,
-				ID:       bgID,
-				Name:     bgName,
-				URL:      bgUrl,
+				IsSet:    game.BggID != nil,
+				ID:       game.BggID,
+				Name:     game.BggName,
+				URL:      game.BggUrl,
 				ImageURL: game.BggImageUrl,
 			},
 			UpdatedAt: time.Now(),
@@ -515,14 +449,10 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 	}
 
 	var participantID string
-	if participantID, err = c.DB.InsertParticipant(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
-		log.Println("failed to add user to participants table:", err)
+	if participantID, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
+		log.Println("failed to add player:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
-	}
-
-	if _, err = c.updateTelegram(ctx, eventID); err != nil {
-		log.Println("failed to update telegram", err)
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{"message": "Player added."})
@@ -630,6 +560,73 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		if _, _, err = c.Service.DeleteGame(payload.EventID, payload.ID, payload.UserID, payload.UserName); err != nil {
 			log.Println("failed to delete game from webhook:", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to delete game"})
+			return
+		}
+	case models.HooksWebhookTypeUpdateGame:
+		var payload *models.HookUpdateGamePayload
+		if payload, err = Cast[models.HookUpdateGamePayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing update game webhook: %+v", payload)
+
+		gameID, err := c.DB.SelectGameIDByGameUUID(payload.ID)
+		if err != nil {
+			log.Println("failed to get game ID from UUID in webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to update game"})
+			return
+		}
+
+		unlink := ""
+		if payload.BGG.URL == nil {
+			unlink = "on"
+		}
+		if _, _, err = c.Service.UpdateGame(payload.EventID, gameID, payload.UserID, models.UpdateGameRequest{
+			MaxPlayers: &payload.MaxPlayers,
+			BggUrl:     payload.BGG.URL,
+			UserID:     payload.UserID,
+			UserName:   payload.UserName,
+			Unlink:     unlink,
+		}); err != nil {
+			log.Println("failed to update game from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to update game"})
+			return
+		}
+
+	case models.HookWebhookTypeAddParticipant:
+		var payload *models.HookAddParticipantPayload
+		if payload, err = Cast[models.HookAddParticipantPayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing add participant webhook: %+v", payload)
+
+		gameID, err := c.DB.SelectGameIDByGameUUID(payload.GameID)
+		if err != nil {
+			log.Println("failed to get game ID from UUID in webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add participant"})
+			return
+		}
+
+		if _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName); err != nil {
+			log.Println("failed to add participant from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add participant"})
+			return
+		}
+	case models.HookWebhookTypeRemoveParticipant:
+		var payload *models.HookRemoveParticipantPayload
+		if payload, err = Cast[models.HookRemoveParticipantPayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing remove participant webhook: %+v", payload)
+
+		if err = c.Service.DeletePlayer(payload.EventID, payload.UserID); err != nil {
+			log.Println("failed to remove participant from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to remove participant"})
 			return
 		}
 
