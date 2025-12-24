@@ -49,7 +49,7 @@ type HookBGGInfo struct {
 }
 
 type HookNewGamePayload struct {
-	ID         int64       `json:"id"`
+	ID         string      `json:"id"`
 	EventID    string      `json:"event_id"`
 	UserID     int64       `json:"user_id"`
 	UserName   string      `json:"user_name"`
@@ -62,7 +62,7 @@ type HookNewGamePayload struct {
 
 type HookDeleteGamePayload struct {
 	EventID   string `json:"event_id"`
-	ID        int64  `json:"id"`
+	ID        string `json:"id"`
 	Name      string `json:"name"`
 	UserID    int64  `json:"user_id"`
 	UserName  string `json:"user_name"`
@@ -70,7 +70,7 @@ type HookDeleteGamePayload struct {
 }
 
 type HookUpdateGamePayload struct {
-	ID         int64       `json:"id"`
+	ID         string      `json:"id"`
 	EventID    string      `json:"event_id"`
 	UserID     int64       `json:"user_id"`
 	UserName   string      `json:"user_name"`
@@ -83,18 +83,18 @@ type HookUpdateGamePayload struct {
 
 // --- Participant payloads ---
 type HookAddParticipantPayload struct {
+	ID       string    `json:"id"`
 	EventID  string    `json:"event_id"`
-	GameID   int64     `json:"game_id"`
-	ID       int64     `json:"id"`
 	UserID   int64     `json:"user_id"`
+	GameID   string    `json:"game_id"`
 	UserName string    `json:"user_name"`
 	AddedAt  time.Time `json:"added_at"`
 }
 
 type HookRemoveParticipantPayload struct {
+	ID        string    `json:"id"`
 	EventID   string    `json:"event_id"`
-	GameID    int64     `json:"game_id"`
-	ID        int64     `json:"id"`
+	GameID    string    `json:"game_id"`
 	UserID    int64     `json:"user_id"`
 	UserName  string    `json:"user_name"`
 	RemovedAt time.Time `json:"removed_at"`

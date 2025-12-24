@@ -4,6 +4,7 @@ import (
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
+	"boardgame-night-bot/src/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -211,12 +212,7 @@ func (c *Controller) Game(ctx *gin.Context) {
 
 	localizer := c.Localizer(&event.ChatID)
 
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
-	}
+	game = utils.PickGame(event, gameID)
 
 	if game.Name == models.PLAYER_COUNTER {
 		game.Name = localizer.MustLocalizeMessage(&i18n.Message{ID: "JoinEvent"})
@@ -363,7 +359,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HooksWebhookTypeUpdateGame,
 		Data: models.HookUpdateGamePayload{
-			ID:         gameID,
+			ID:         game.UUID,
 			EventID:    event.ID,
 			UserID:     bg.UserID,
 			UserName:   bg.UserName,
@@ -407,7 +403,14 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 	var event *models.Event
 	var game *models.BoardGame
 
-	if event, game, err = c.Service.DeleteGame(eventID, gameID, userID, username); err != nil {
+	var gameUUID string
+	if gameUUID, err = c.DB.SelectGameUUIDByGameID(gameID); err != nil {
+		log.Println("failed to load game UUID:", err)
+		c.renderError(ctx, nil, nil, "Invalid game ID")
+		return
+	}
+
+	if event, game, err = c.Service.DeleteGame(eventID, gameUUID, userID, username); err != nil {
 		log.Println("failed to delete game:", err)
 		c.renderError(ctx, &eventID, &event.ChatID, "Failed to delete game")
 		return
@@ -418,7 +421,7 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 	c.Hook.SendAllWebhookAsync(ctx, event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeDeleteGame,
 		Data: models.HookDeleteGamePayload{
-			ID:        game.ID,
+			ID:        game.UUID,
 			EventID:   event.ID,
 			Name:      game.Name,
 			UserID:    userID,
@@ -476,7 +479,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeNewGame,
 		Data: models.HookNewGamePayload{
-			ID:         game.ID,
+			ID:         game.UUID,
 			EventID:    event.ID,
 			UserID:     event.UserID,
 			UserName:   event.UserName,
@@ -511,8 +514,8 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 		return
 	}
 
-	var participantID int64
-	if participantID, err = c.DB.InsertParticipant(eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
+	var participantID string
+	if participantID, err = c.DB.InsertParticipant(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
@@ -530,12 +533,14 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 		return
 	}
 
+	game := utils.PickGame(event, addPlayer.GameID)
+
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeAddParticipant,
 		Data: models.HookAddParticipantPayload{
 			ID:       participantID,
 			EventID:  event.ID,
-			GameID:   addPlayer.GameID,
+			GameID:   game.UUID,
 			UserID:   addPlayer.UserID,
 			UserName: addPlayer.UserName,
 			AddedAt:  time.Now(),

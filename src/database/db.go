@@ -4,7 +4,6 @@ import (
 	"boardgame-night-bot/src/models"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"path/filepath"
 	"sort"
@@ -62,6 +61,7 @@ func (d *Database) CreateTables() {
 		);`,
 		`CREATE TABLE IF NOT EXISTS boardgames (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
 			event_id INTEGER,
 			name TEXT,
 			max_players INTEGER,
@@ -74,6 +74,7 @@ func (d *Database) CreateTables() {
 		);`,
 		`CREATE TABLE IF NOT EXISTS participants (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
 			event_id INTEGER,
 			boardgame_id INTEGER,
 			user_id INTEGER,
@@ -84,6 +85,7 @@ func (d *Database) CreateTables() {
 		);`,
 		`CREATE TABLE IF NOT EXISTS webhooks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
 			chat_id INTEGER NOT NULL,
 			url TEXT  NOT NULL,
 			secret TEXT  NOT NULL,
@@ -103,20 +105,86 @@ func (d *Database) CreateTables() {
 
 func (d *Database) MigrateToV1() {
 	var err error
-	err = d.addColumnIfNotExists("events", "location", "TEXT")
+	_, err = d.addColumnIfNotExists("events", "location", "TEXT")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = d.addColumnIfNotExists("events", "starts_at", "TIMESTAMP")
+	_, err = d.addColumnIfNotExists("events", "starts_at", "TIMESTAMP")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = d.addColumnIfNotExists("chats", "default_location", "TEXT")
+	_, err = d.addColumnIfNotExists("chats", "default_location", "TEXT")
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (d *Database) MigrateToV2() {
+	var err error
+	var addBoardgames, addParticipants bool
+	addBoardgames, err = d.addColumnIfNotExists("boardgames", "uuid", "TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	alignQuery := `
+	UPDATE boardgames
+		SET uuid = lower(
+			hex(randomblob(4)) || '.' ||
+			hex(randomblob(2)) || '.4' ||
+			substr(hex(randomblob(2)), 2) || '.' ||
+			substr('89ab', abs(random()) % 4 + 1, 1) ||
+			substr(hex(randomblob(2)), 2) || '.' ||
+			hex(randomblob(6))
+		)
+		WHERE uuid IS NULL;
+	`
+	_, err = d.db.Exec(alignQuery)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if addBoardgames {
+		enforceUniqueQuery := `CREATE UNIQUE INDEX boardgames_uuid_idx ON boardgames(uuid);`
+		_, err = d.db.Exec(enforceUniqueQuery)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	addParticipants, err = d.addColumnIfNotExists("participants", "uuid", "TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	alignQuery = `
+	UPDATE participants
+		SET uuid = lower(
+			hex(randomblob(4)) || '.' ||
+			hex(randomblob(2)) || '.4' ||
+			substr(hex(randomblob(2)), 2) || '.' ||
+			substr('89ab', abs(random()) % 4 + 1, 1) ||
+			substr(hex(randomblob(2)), 2) || '.' ||
+			hex(randomblob(6))
+		)
+		WHERE uuid IS NULL;
+	`
+	_, err = d.db.Exec(alignQuery)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if addParticipants {
+		enforceUniqueQuery := `CREATE UNIQUE INDEX participants_uuid_idx ON participants(uuid);`
+		_, err = d.db.Exec(enforceUniqueQuery)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Println("database migration to v2 completed")
 }
 
 func (d *Database) Close() {
@@ -173,6 +241,7 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	e.starts_at,
 	e.location,
 	b.id,
+	b.uuid,
 	b.name,
 	b.max_players,
 	b.bgg_id,
@@ -180,6 +249,7 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	b.bgg_url,
 	b.bgg_image_url,
 	p.id,
+	p.uuid,
 	p.user_id,
 	p.user_name
 	FROM events e
@@ -200,6 +270,7 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	e.starts_at,
 	e.location,
 	b.id,
+	b.uuid,
 	b.name,
 	b.max_players,
 	b.bgg_id,
@@ -207,6 +278,7 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	b.bgg_url,
 	b.bgg_image_url,
 	p.id,
+	p.uuid,
 	p.user_id,
 	p.user_name
 	FROM events e
@@ -232,7 +304,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var participant models.Participant
 
 		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID pgtype.Int8
-		var boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
+		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
 		var startsAt pgtype.Timestamp
 
 		if err := rows.Scan(
@@ -244,6 +316,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&startsAt,
 			&location,
 			&boardGameID,
+			&boardGameUUID,
 			&boardGameName,
 			&boardGameMaxPlayers,
 			&bggID,
@@ -251,6 +324,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&bggUrl,
 			&bggImageUrl,
 			&participantID,
+			&participantUUID,
 			&participantUserID,
 			&participantUserName,
 		); err != nil {
@@ -265,6 +339,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		if IntOrNil(boardGameID) != nil {
 			boardGame = models.BoardGame{
 				ID:          *IntOrNil(boardGameID),
+				UUID:        *StringOrNil(boardGameUUID),
 				Name:        *StringOrNil(boardGameName),
 				MaxPlayers:  *IntOrNil(boardGameMaxPlayers),
 				BggID:       IntOrNil(bggID),
@@ -281,6 +356,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		if IntOrNil(participantID) != nil {
 			participant = models.Participant{
 				ID:       *IntOrNil(participantID),
+				UUID:     *StringOrNil(participantUUID),
 				UserID:   *IntOrNil(participantUserID),
 				UserName: *StringOrNil(participantUserName),
 			}
@@ -308,6 +384,32 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 	return event, nil
 }
 
+func (d *Database) SelectGameIDByGameUUID(gameUUID string) (int64, error) {
+	query := `SELECT id FROM boardgames WHERE uuid = @uuid;`
+	var id int64
+	if err := d.db.QueryRow(query,
+		NamedArgs(map[string]any{
+			"uuid": gameUUID,
+		})...,
+	).Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (d *Database) SelectGameUUIDByGameID(gameID int64) (string, error) {
+	query := `SELECT uuid FROM boardgames WHERE id = @id;`
+	var uuid string
+	if err := d.db.QueryRow(query,
+		NamedArgs(map[string]any{
+			"id": gameID,
+		})...,
+	).Scan(&uuid); err != nil {
+		return "", err
+	}
+	return uuid, nil
+}
+
 func (d *Database) UpdateEventMessageID(eventID string, messageID int64) error {
 	query := `UPDATE events SET message_id = @message_id where id = @event_id;`
 
@@ -323,16 +425,14 @@ func (d *Database) UpdateEventMessageID(eventID string, messageID int64) error {
 	return nil
 }
 
-func (d *Database) InsertBoardGame(eventID string, id *int64, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, error) {
+func (d *Database) InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
 	var boardGameID int64
-
-	pId := "id, "
-	pqId := "@id, "
 	if id == nil {
-		pId = ""
-		pqId = ""
+		pId := uuid.New().String()
+		id = &pId
 	}
-	query := fmt.Sprintf(`INSERT INTO boardgames (event_id, %s name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url) VALUES (@event_id, %s @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url) RETURNING id;`, pId, pqId)
+
+	query := `INSERT INTO boardgames (event_id, uuid, name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url) VALUES (@event_id, @uuid, @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url) RETURNING id,uuid;`
 
 	if bggImageUrl != nil && *bggImageUrl == "" {
 		// Fix for BGG image URLs that contains a filter with mandatory (png)
@@ -345,7 +445,7 @@ func (d *Database) InsertBoardGame(eventID string, id *int64, name string, maxPl
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
 			"event_id":      eventID,
-			"id":            id,
+			"uuid":          id,
 			"name":          name,
 			"max_players":   maxPlayers,
 			"bgg_id":        bggID,
@@ -353,11 +453,11 @@ func (d *Database) InsertBoardGame(eventID string, id *int64, name string, maxPl
 			"bgg_name":      bggName,
 			"bgg_image_url": bggImageUrl,
 		})...,
-	).Scan(&boardGameID); err != nil {
-		return 0, err
+	).Scan(&boardGameID, id); err != nil {
+		return 0, "", err
 	}
 
-	return boardGameID, nil
+	return boardGameID, *id, nil
 }
 
 func (d *Database) UpdateBoardGameMessageID(boardgameID, messageID int64) error {
@@ -393,8 +493,8 @@ func (d *Database) UpdateBoardGamePlayerNumber(messageID int64, maxPlayers int) 
 	return boardGameID, name, nil
 }
 
-func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
-	var boardGameID int64
+func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (string, string, error) {
+	var boardGameID string
 	var name string
 
 	query := `UPDATE boardgames 
@@ -404,7 +504,7 @@ func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID
 	bgg_name = @bgg_name,
 	bgg_url = @bgg_url,
 	bgg_image_url = @bgg_image_url
-	WHERE message_id = @message_id RETURNING id, name;`
+	WHERE message_id = @message_id RETURNING uuid, name;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
@@ -416,7 +516,7 @@ func (d *Database) UpdateBoardGameBGGInfo(messageID int64, maxPlayers int, bggID
 			"bgg_image_url": bggImageUrl,
 		})...,
 	).Scan(&boardGameID, &name); err != nil {
-		return 0, "", ParseError(err)
+		return "", "", ParseError(err)
 	}
 
 	return boardGameID, name, nil
@@ -448,12 +548,12 @@ func (d *Database) UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *i
 	return nil
 }
 
-func (d *Database) DeleteBoardGameByID(ID int64) error {
-	query := `DELETE FROM boardgames WHERE id = @id;`
+func (d *Database) DeleteBoardGameByID(ID string) error {
+	query := `DELETE FROM boardgames WHERE uuid = @uuid;`
 
 	if _, err := d.db.Exec(query,
 		NamedArgs(map[string]any{
-			"id": ID,
+			"uuid": ID,
 		})...,
 	); err != nil {
 		return err
@@ -477,27 +577,32 @@ func (d *Database) HasBoardGameWithMessageID(messageID int64) bool {
 	return true
 }
 
-func (d *Database) InsertParticipant(eventID string, boardgameID, userID int64, userName string) (int64, error) {
-	var participantID int64
-	query := `INSERT INTO participants (event_id, boardgame_id, user_id, user_name) VALUES (@event_id, @boardgame_id, @user_id, @user_name) RETURNING id;`
+func (d *Database) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error) {
+
+	if id == nil {
+		newID := uuid.New().String()
+		id = &newID
+	}
+	query := `INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name) VALUES (@uuid, @event_id, @boardgame_id, @user_id, @user_name) RETURNING uuid;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
+			"uuid":         id,
 			"event_id":     eventID,
 			"boardgame_id": boardgameID,
 			"user_id":      userID,
 			"user_name":    userName,
 		})...,
-	).Scan(&participantID); err != nil {
-		return 0, err
+	).Scan(id); err != nil {
+		return "", err
 	}
 
-	return participantID, nil
+	return *id, nil
 }
 
-func (d *Database) RemoveParticipant(eventID string, userID int64) (int64, int64, error) {
-	query := `DELETE FROM participants WHERE event_id = @event_id AND user_id = @user_id RETURNING id, boardgame_id;`
-	var id int64
+func (d *Database) RemoveParticipant(eventID string, userID int64) (string, int64, error) {
+	query := `DELETE FROM participants WHERE event_id = @event_id AND user_id = @user_id RETURNING uuid, boardgame_id;`
+	var id string
 	var boardgameID int64
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
@@ -505,7 +610,7 @@ func (d *Database) RemoveParticipant(eventID string, userID int64) (int64, int64
 			"user_id":  userID,
 		})...,
 	).Scan(&id, &boardgameID); err != nil {
-		return 0, 0, err
+		return "", 0, err
 	}
 
 	return id, boardgameID, nil
@@ -554,10 +659,11 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 }
 
 func (d *Database) InsertWebhook(chatID int64, url, secret string) (*int64, error) {
-	query := `INSERT INTO webhooks (chat_id, url, secret) VALUES (@chat_id, @url, @secret) RETURNING id;`
+	query := `INSERT INTO webhooks (uuid, chat_id, url, secret) VALUES (@uuid, @chat_id, @url, @secret) RETURNING id;`
 	var id int64
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
+			"uuid":    uuid.New().String(),
 			"chat_id": chatID,
 			"url":     url,
 			"secret":  secret,
@@ -584,7 +690,7 @@ func (d *Database) RemoveWebhook(webhookID int64) error {
 }
 
 func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
-	query := `SELECT id, chat_id, url, secret, created_at FROM webhooks WHERE chat_id = @chat_id;`
+	query := `SELECT id, uuid, chat_id, url, secret, created_at FROM webhooks WHERE chat_id = @chat_id;`
 
 	rows, err := d.db.Query(query,
 		NamedArgs(map[string]any{
@@ -606,6 +712,7 @@ func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
 		var webhook models.Webhook
 		if err := rows.Scan(
 			&webhook.ID,
+			&webhook.UUID,
 			&webhook.ChatID,
 			&webhook.Url,
 			&webhook.Secret,
@@ -624,7 +731,7 @@ func (d *Database) GetWebhooksByChatID(chatID int64) ([]models.Webhook, error) {
 	return webhooks, nil
 }
 
-func (d *Database) addColumnIfNotExists(table, column, columnType string) error {
+func (d *Database) addColumnIfNotExists(table, column, columnType string) (bool, error) {
 	query := `
 		SELECT 1
 		FROM pragma_table_info(?)
@@ -638,10 +745,10 @@ func (d *Database) addColumnIfNotExists(table, column, columnType string) error 
 		log.Println("migrating database: adding column", column, "to table", table)
 		alter := "ALTER TABLE " + table + " ADD COLUMN " + column + " " + columnType
 		_, err = d.db.Exec(alter)
-		return err
+		return true, err
 	}
 
-	return err
+	return false, err
 }
 
 func IntOrNil(i pgtype.Int8) *int64 {

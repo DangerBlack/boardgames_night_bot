@@ -3,6 +3,7 @@ package api
 import (
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/models"
+	"boardgame-night-bot/src/utils"
 	"context"
 	"errors"
 	"fmt"
@@ -38,7 +39,7 @@ func NewService(db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, languag
 // Method signatures
 func (s *Service) CreateGame(
 	eventID string,
-	id *int64,
+	id *string,
 	userID int64,
 	name string,
 	maxPlayers *int,
@@ -136,7 +137,7 @@ func (s *Service) CreateGame(
 
 	log.Printf("Inserting %s in the db", name)
 
-	if _, err = s.DB.InsertBoardGame(event.ID, id, name, *finalMaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
+	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, *finalMaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
 		log.Println("failed to insert board game:", err)
 		return nil, nil, errors.New("failed to insert board game")
 	}
@@ -161,7 +162,7 @@ func (s *Service) UpdateGame( /* params */ ) error {
 	return nil
 }
 
-func (s *Service) DeleteGame(eventID string, gameID int64, userID int64, username string) (*models.Event, *models.BoardGame, error) {
+func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, username string) (*models.Event, *models.BoardGame, error) {
 	var err error
 	var event *models.Event
 	var game *models.BoardGame
@@ -176,18 +177,14 @@ func (s *Service) DeleteGame(eventID string, gameID int64, userID int64, usernam
 		return nil, nil, errors.New("unable to delete game from locked event")
 	}
 
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
-	}
+	game = utils.PickGameUUID(event, gameUUID)
 
 	if game == nil {
+		log.Printf("invalid game ID: %s", gameUUID)
 		return nil, nil, errors.New("invalid game ID")
 	}
 
-	if err = s.DB.DeleteBoardGameByID(gameID); err != nil {
+	if err = s.DB.DeleteBoardGameByID(gameUUID); err != nil {
 		log.Println("failed to delete board game:", err)
 		return nil, nil, errors.New("failed to delete board game")
 	}

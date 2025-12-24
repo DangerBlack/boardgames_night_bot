@@ -85,7 +85,7 @@ When a new game is added to an event, you will receive a POST request with the f
 {
     "type": "new_game",
     "data": {
-        "id": 123,
+        "id": "string",
         "event_id": "string",
         "user_id": 123456,
         "user_name": "string",
@@ -113,7 +113,7 @@ When a game is deleted from an event, you will receive a POST request with the f
     "type": "delete_game",
     "data": {
         "event_id": "string",
-        "id": 123,
+        "id": "string",
         "name": "string",
         "user_id": 123456,
         "user_name": "string",
@@ -130,7 +130,7 @@ When an already existing game is updated, you will receive a POST request with t
 {
     "type": "update_game",
     "data": {
-        "id": 123,
+        "id": "string",
         "event_id": "string",
         "user_id": 123456,
         "user_name": "string",
@@ -157,10 +157,10 @@ When a participant is added to a game, you will receive a POST request with the 
 {
     "type": "add_participant",
     "data": {
+        "id": "string",
         "event_id": "string",
-        "game_id": 123,
-        "id": 456,
         "user_id": 789,
+        "game_id": "string",
         "user_name": "string",
         "added_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
@@ -175,10 +175,10 @@ When a participant is removed from a game, you will receive a POST request with 
 {
     "type": "remove_participant",
     "data": {
+        "id": "string",
         "event_id": "string",
-        "game_id": 123,
-        "id": 456,
         "user_id": 789,
+        "game_id": "string",
         "user_name": "string",
         "removed_at": "YYYY-MM-DDTHH:MM:SSZ"
     }

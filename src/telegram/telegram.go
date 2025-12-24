@@ -208,9 +208,9 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	}
 	log.Printf("Event created with id: %s", eventID)
 
-	var counterGameID int64
+	var counterGameID string
 	if strings.Contains(fullText, "👥") {
-		if counterGameID, err = t.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
+		if _, counterGameID, err = t.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
 			log.Println("failed to add game:", err)
 			failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 			return c.Reply(failedT)
@@ -255,7 +255,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		},
 	})
 
-	if counterGameID != 0 {
+	if counterGameID != "" {
 		t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 			Type: models.HookWebhookTypeNewGame,
 			Data: models.HookNewGamePayload{
@@ -305,6 +305,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 
 	var event *models.Event
 	var boardGameID int64
+	var boardGameUUID string
 
 	if event, err = t.DB.SelectEvent(chatID); err != nil {
 		log.Println("failed to add game:", err)
@@ -363,14 +364,14 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		}
 	}
 
-	if boardGameID, err = t.DB.InsertBoardGame(event.ID, nil, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl); err != nil {
+	if boardGameID, boardGameUUID, err = t.DB.InsertBoardGame(event.ID, nil, gameName, maxPlayers, bgID, bgName, bgUrl, bggImageUrl); err != nil {
 		log.Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
 
-	var participantID int64
-	if participantID, err = t.DB.InsertParticipant(event.ID, boardGameID, userID, userName); err != nil {
+	var participantID string
+	if participantID, err = t.DB.InsertParticipant(nil, event.ID, boardGameID, userID, userName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
@@ -441,7 +442,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeNewGame,
 		Data: models.HookNewGamePayload{
-			ID:         boardGameID,
+			ID:         boardGameUUID,
 			EventID:    event.ID,
 			UserID:     userID,
 			UserName:   userName,
@@ -464,7 +465,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		Data: models.HookAddParticipantPayload{
 			ID:       participantID,
 			EventID:  event.ID,
-			GameID:   boardGameID,
+			GameID:   boardGameUUID,
 			UserID:   userID,
 			UserName: userName,
 			AddedAt:  time.Now(),
@@ -552,18 +553,12 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 		return c.Reply(failedT)
 	}
 
-	var game *models.BoardGame
-	for _, g := range event.BoardGames {
-		if g.ID == gameID {
-			game = &g
-			break
-		}
-	}
+	game := utils.PickGame(event, gameID)
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HooksWebhookTypeUpdateGame,
 		Data: models.HookUpdateGamePayload{
-			ID:         gameID,
+			ID:         game.UUID,
 			EventID:    event.ID,
 			UserID:     c.Sender().ID,
 			UserName:   c.Sender().Username,
@@ -607,7 +602,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 
 	log.Printf("Updating game message id: %d with number of players: %d", messageID, maxPlayers)
 
-	var gameID int64
+	var gameID string
 	var gameName string
 	if gameID, gameName, err = t.DB.UpdateBoardGameBGGInfo(int64(messageID), *maxPlayers, &id, bgName, bgUrl, bgImageUrl); err != nil {
 		if errors.Is(err, database.ErrNoRows) {
@@ -896,8 +891,8 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 	userName := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to join a game.", userName, userID)
 
-	var participantID int64
-	if participantID, err = t.DB.InsertParticipant(eventID, boardGameID, userID, userName); err != nil {
+	var participantID string
+	if participantID, err = t.DB.InsertParticipant(nil, eventID, boardGameID, userID, userName); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddPlayer"}}))
 	}
@@ -906,6 +901,8 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 		log.Println("failed to add game:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "EventNotFound"}}))
 	}
+
+	game := utils.PickGame(event, boardGameID)
 
 	if event.MessageID == nil {
 		log.Println("event message id is nil")
@@ -931,7 +928,7 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 		Data: models.HookAddParticipantPayload{
 			ID:       participantID,
 			EventID:  event.ID,
-			GameID:   boardGameID,
+			GameID:   game.UUID,
 			UserID:   userID,
 			UserName: userName,
 			AddedAt:  time.Now(),
@@ -963,7 +960,8 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 	userName := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to exit a game.", userName, userID)
 
-	var participantID, boardGameID int64
+	var participantID string
+	var boardGameID int64
 	if participantID, boardGameID, err = t.DB.RemoveParticipant(eventID, userID); err != nil {
 		log.Println("failed to remove user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRemovePlayer"}}))
@@ -993,13 +991,15 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateMessageEvent"}}))
 	}
 
+	game := utils.PickGame(event, boardGameID)
+
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeRemoveParticipant,
 		Data: models.HookRemoveParticipantPayload{
 			ID:        participantID,
 			EventID:   event.ID,
 			UserID:    userID,
-			GameID:    boardGameID,
+			GameID:    game.UUID,
 			UserName:  userName,
 			RemovedAt: time.Now(),
 		},
