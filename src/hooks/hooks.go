@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -39,21 +40,22 @@ func (wc *WebhookClient) SendAllWebhookAsync(ctx context.Context, chatID int64, 
 	}
 
 	for _, webhook := range webhooks {
-		wc.SendWebhookAsync(ctx, webhook.Url, payload, webhook.Secret)
+		wc.SendWebhookAsync(ctx, chatID, webhook.Url, payload, webhook.Secret)
 	}
 }
 
 // SendWebhookAsync dispatches the webhook event in a separate goroutine, signing the payload with the new signature scheme.
-func (wc *WebhookClient) SendWebhookAsync(ctx context.Context, url string, payload models.HookWebhookEnvelope, secret string) {
+func (wc *WebhookClient) SendWebhookAsync(ctx context.Context, chatID int64, url string, payload models.HookWebhookEnvelope, secret string) {
 	go func() {
-		_ = wc.SendWebhookWithRetry(ctx, url, payload, secret)
+		_ = wc.SendWebhookWithRetry(ctx, chatID, url, payload, secret)
 	}()
 }
 
 // SendWebhookWithRetry sends the webhook event with retry logic, signing the payload with the new signature scheme.
-func (wc *WebhookClient) SendWebhookWithRetry(ctx context.Context, url string, payload models.HookWebhookEnvelope, secret string) error {
+func (wc *WebhookClient) SendWebhookWithRetry(ctx context.Context, chatID int64, url string, payload models.HookWebhookEnvelope, secret string) error {
 	var lastErr error
 	for attempt := 1; attempt <= wc.MaxAttempt; attempt++ {
+		log.Printf("In chat %d, attempt %d to send webhook to %s", chatID, attempt, url)
 		if err := wc.sendWebhook(ctx, url, payload, secret); err != nil {
 			lastErr = err
 			time.Sleep(time.Second * time.Duration(attempt)) // Exponential backoff
