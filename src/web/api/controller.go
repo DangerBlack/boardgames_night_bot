@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/DangerBlack/gobgg"
@@ -488,48 +487,13 @@ func P(x string) *string {
 	return &x
 }
 
-func (c *Controller) updateTelegram(ctx *gin.Context, eventID string) (*models.Event, error) {
-	var err error
-	var event *models.Event
-
-	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
-		c.renderError(ctx, &eventID, &event.ChatID, "Invalid event ID")
-
-		return nil, err
-	}
-
-	if event.MessageID == nil {
-		log.Println("event message id is nil")
-		c.renderError(ctx, &eventID, &event.ChatID, "Invalid message ID")
-		return nil, err
-	}
-
-	body, markup := event.FormatMsg(c.Localizer(&event.ChatID), c.Url)
-
-	_, err = c.Bot.Edit(&telebot.Message{
-		ID: int(*event.MessageID),
-		Chat: &telebot.Chat{
-			ID: event.ChatID,
-		},
-	}, body, markup, telebot.NoPreview)
-	if err != nil {
-		log.Println("failed to edit message", err)
-		if strings.Contains(err.Error(), models.MessageUnchangedErrorMessage) {
-			log.Println("failed because unchanged", err)
-		}
-	}
-
-	return event, nil
-}
-
 func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		webhookID := ctx.Param("webhook_id")
 
 		webhook, err := c.DB.GetWebhookByWebhookID(webhookID)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
 			return
 		}
 
@@ -547,8 +511,12 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
+		log.Default().Printf("Verifying webhook %s at %s, secret [%s] with body: %s", webhookID, date, webhook.Secret, string(body))
+
 		contentHash := sha256.Sum256(body)
 		contentHashHex := hex.EncodeToString(contentHash[:])
+
+		log.Default().Printf("Computed content hash: %s", contentHashHex)
 
 		if ctx.GetHeader("x-ms-content-sha256") != contentHashHex {
 			ctx.AbortWithStatusJSON(400, gin.H{"error": "hash mismatch"})
@@ -592,7 +560,7 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 func (c *Controller) ListenWebhook(ctx *gin.Context) {
 	var err error
 	chatID := ctx.GetInt64("chat_id")
-	// threadID := ctx.GetInt64("thread_id")
+	threadID := ctx.GetInt64("thread_id")
 
 	var webhookEnvelope models.HookWebhookEnvelope
 	if err = ctx.ShouldBindJSON(&webhookEnvelope); err != nil {
@@ -604,6 +572,29 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 	log.Printf("Received webhook for chat %d: %v", chatID, webhookEnvelope)
 
 	switch webhookEnvelope.Type {
+	case models.HookWebhookTypeNewEvent:
+		var payload *models.HookNewEventPayload
+		if payload, err = Cast[models.HookNewEventPayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		if payload.ChatID == 0 {
+			payload.ChatID = chatID
+		}
+
+		if payload.ChatID != chatID {
+			log.Printf("Webhook chat ID %d does not match expected chat ID %d", payload.ChatID, chatID)
+			ctx.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+			return
+		}
+
+		log.Printf("Processing new event webhook: %+v", payload)
+		if _, err = c.Service.CreateEvent(payload.ChatID, &threadID, &payload.ID, payload.UserID, payload.UserName, payload.Name, payload.Location, payload.StartsAt); err != nil {
+			log.Println("failed to add event from webhook:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add event"})
+			return
+		}
 	case models.HookWebhookTypeNewGame:
 		var payload *models.HookNewGamePayload
 		if payload, err = Cast[models.HookNewGamePayload](webhookEnvelope.Data); err != nil {
@@ -662,7 +653,6 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to update game"})
 			return
 		}
-
 	case models.HookWebhookTypeAddParticipant:
 		var payload *models.HookAddParticipantPayload
 		if payload, err = Cast[models.HookAddParticipantPayload](webhookEnvelope.Data); err != nil {

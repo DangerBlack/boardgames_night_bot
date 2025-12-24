@@ -10,6 +10,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/DangerBlack/gobgg"
 
@@ -34,6 +35,58 @@ func NewService(db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, languag
 		LanguageBundle: languageBundle,
 		Url:            url,
 	}
+}
+
+func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time) (*models.Event, error) {
+	var err error
+	fullText := name
+	log.Println("Full text for parsing:", fullText)
+
+	var eventID string
+	log.Printf("Creating event: %s by user: %s (%d) in chat: %d", name, userName, userID, chatID)
+
+	if eventID, err = s.DB.InsertEvent(id, chatID, userID, userName, name, nil, location, startsAt); err != nil {
+		log.Println("failed to create event:", err)
+		return nil, errors.New("failed to create event")
+	}
+	log.Printf("Event created with id: %s", eventID)
+
+	var event *models.Event
+
+	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
+		log.Println("failed to load game:", err)
+		return nil, errors.New("invalid event ID")
+	}
+
+	body, markup := event.FormatMsg(s.Localizer(&chatID), s.Url)
+
+	to := &telebot.Chat{
+		ID: chatID,
+	}
+
+	opts := &telebot.SendOptions{
+		ParseMode: telebot.ModeHTML,
+	}
+	if theadID != nil {
+		opts.ReplyTo = &telebot.Message{
+			ID: int(*theadID),
+		}
+	}
+
+	responseMsg, err := s.Bot.Send(to, body, opts, markup, telebot.NoPreview)
+	if err != nil {
+		log.Println("failed to create event:", err)
+		return nil, errors.New("failed to create event")
+	}
+
+	if err = s.DB.UpdateEventMessageID(eventID, int64(responseMsg.ID)); err != nil {
+		log.Println("failed to create event:", err)
+		return nil, errors.New("failed to create event")
+	}
+
+	event.MessageID = utils.IntToPointer(responseMsg.ID)
+
+	return event, nil
 }
 
 // Method signatures
