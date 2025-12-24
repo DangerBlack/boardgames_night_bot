@@ -659,22 +659,23 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	return language
 }
 
-func (d *Database) InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, error) {
+func (d *Database) InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error) {
 	query := `INSERT INTO webhooks (uuid, chat_id, thread_id, url, secret) VALUES (@uuid, @chat_id, @thread_id, @url, @secret) RETURNING id;`
 	var id int64
+	uuidV := uuid.New().String()
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
-			"uuid":      uuid.New().String(),
+			"uuid":      uuidV,
 			"chat_id":   chatID,
 			"thread_id": threadID,
 			"url":       url,
 			"secret":    secret,
 		})...,
 	).Scan(&id); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &id, nil
+	return &id, &uuidV, nil
 }
 
 func (d *Database) RemoveWebhook(webhookID int64) error {

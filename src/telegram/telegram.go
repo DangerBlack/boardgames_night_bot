@@ -832,7 +832,8 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	}
 
 	var webhookID *int64
-	if webhookID, err = t.DB.InsertWebhook(chatID, threadID, webhookUrl, secret); err != nil {
+	var webhookUUID *string
+	if webhookID, webhookUUID, err = t.DB.InsertWebhook(chatID, threadID, webhookUrl, secret); err != nil {
 		log.Println("failed to register webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
@@ -861,9 +862,10 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 			ID: "WebhookSecret",
 		},
 		TemplateData: map[string]string{
-			"Secret":     secret,
-			"WebhookUrl": webhookUrl,
-			"ChatName":   chatName,
+			"Secret":      secret,
+			"WebhookUrl":  webhookUrl,
+			"ChatName":    chatName,
+			"CallbackUrl": fmt.Sprintf("%s/webhooks/%s", t.Url.BaseUrl, *webhookUUID),
 		},
 	})
 

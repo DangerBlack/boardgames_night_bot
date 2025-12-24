@@ -101,6 +101,11 @@ func main() {
 		log.Fatal("the BOT_MINI_APP_URL is not set in .env file")
 	}
 
+	baseUrl := os.Getenv("BASE_URL")
+	if baseUrl == "" {
+		log.Fatal("the BASE_URL is not set in .env file")
+	}
+
 	healthCheckUrl := os.Getenv("HEALTH_CHECK_URL")
 	InitHealthCheck(healthCheckUrl)
 
@@ -156,6 +161,7 @@ func main() {
 		LanguageBundle: bundle,
 		LanguagePack:   lp,
 		Url: models.WebUrl{
+			BaseUrl:       baseUrl,
 			BotMiniAppURL: botMiniAppURL,
 		},
 		Hook: wh,
@@ -167,7 +173,7 @@ func main() {
 
 	go func() {
 		log.Println("server started")
-		web.StartServer(port, db, bgg, bot, bundle, wh, botMiniAppURL)
+		web.StartServer(port, db, bgg, bot, bundle, wh, botMiniAppURL, baseUrl)
 		log.Println("server stopped")
 	}()
 	go func() {
