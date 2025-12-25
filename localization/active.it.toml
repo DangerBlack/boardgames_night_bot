@@ -8,9 +8,12 @@ Utilizzo:
     🔒 Rendi l'evento modificabile solo da te
     📍 Definisci la location dell'evento
     👥 Aggiungi un bottone per permettere agli utenti di partecipare senza scegliere un gioco
+    🕒 Specifica l'orario dell'evento formattato come YYYY-MM-DD HH:MM (es. 2023-12-31 20:30)
 - Usa /add_game [nome gioco] per aggiungere giochi all'evento.
 - Usa /language [lan] per impostare la lingua del bot (en/it/de).
 - Usa /location [luogo] per impostare o aggiornare la location usata di default della chat.
+- Usa /register [URL] per registrare un webhook.
+- Usa /test per inviare un messaggio di test al webhook registrato.
 
 Clicca sui pulsanti per unirti o lasciare un gioco.
 Divertiti! 🎉
@@ -70,6 +73,7 @@ WebhookSecret = """Webhook creato per la chat <b>{{.ChatName}}</b>!
 
 Conserva questo segreto in un luogo sicuro. Usalo per validare la firma HMAC delle richieste ricevute."""
 OnlyAdminsCanRegisterWebhook = "Solo gli amministratori della chat possono registrare un webhook."
+WebhookTestDispatched = "Messaggio di test inviato al webhook."
 
 Open = "Premi qui per aprire le impostazioni dell'evento {{.Name}} e partecipare."
 

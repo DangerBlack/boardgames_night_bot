@@ -8,9 +8,12 @@ Verwendung:
     🔒 Das Event nur von dir bearbeitbar machen
     📍 Den Veranstaltungsort festlegen
     👥 Einen Button hinzufügen, der es Nutzern erlaubt teilzunehmen, ohne ein bestimmtes Spiel auszuwählen
+    🕒 Die Veranstaltungszeit im Format JJJJ-MM-TT HH:MM angeben (z.B. 2023-12-31 20:30)
 - Nutze /add_game [Spielname], um Spiele zum Event hinzuzufügen.
 - Nutze /language [lan], um die Sprache des Bots einzustellen (en/it/de).
 - Nutze /location [Ort], um den Standardort des Chats festzulegen oder zu aktualisieren.
+- Nutze /register [URL], um einen Webhook zu registrieren.
+- Nutze /test , um eine Testnachricht an den registrierten Webhook zu senden.
 
 Klicke auf die Buttons, um einem Spiel beizutreten oder es zu verlassen.
 Viel Spaß! 🎉
@@ -70,6 +73,7 @@ WebhookSecret = """Webhook created for chat <b>{{.ChatName}}</b>!
 
 Keep this secret in a safe place. Use it to validate the HMAC signature of received requests."""
 OnlyAdminsCanRegisterWebhook = "Only chat administrators can register a webhook."
+WebhookTestDispatched = "Testnachricht an den Webhook gesendet."
 
 Open = "Hier klicken, um die Einstellungen für Ereignis {{.Name}} zu öffnen und beizutreten."
 
