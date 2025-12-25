@@ -5,6 +5,7 @@ import (
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/utils"
+	"boardgame-night-bot/src/web/limiter"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -38,6 +39,7 @@ type Controller struct {
 	Url            models.WebUrl
 	Hook           *hooks.WebhookClient
 	Service        *Service
+	Limiter        *limiter.Limiter
 }
 
 func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseUrl string) *Controller {
@@ -55,6 +57,7 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BG
 		Service: NewService(db, bgg, bot, LanguageBundle, models.WebUrl{
 			BotMiniAppURL: botMiniAppURL,
 		}),
+		Limiter: limiter.NewLimiter(5, 5),
 	}
 }
 
@@ -76,7 +79,13 @@ func (c *Controller) InjectRoute() {
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
 	c.Router.GET("/bgg/search", c.BggSearch)
-	c.Router.POST("/webhooks/:webhook_id", c.VerifyWebhook(), c.CheckEventID(), c.ListenWebhook)
+	c.Router.POST(
+		"/webhooks/:webhook_id",
+		c.Limiter.GinHandler(),
+		c.VerifyWebhook(),
+		c.CheckEventID(),
+		c.ListenWebhook,
+	)
 }
 
 // BggSearch handles GET /bgg/search?name= for autocomplete
