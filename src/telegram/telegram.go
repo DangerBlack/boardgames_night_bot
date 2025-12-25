@@ -44,6 +44,7 @@ func (t Telegram) SetupHandlers() {
 	t.Bot.Handle("/language", t.SetLanguage)
 	t.Bot.Handle("/location", t.SetDefaultLocation)
 	t.Bot.Handle("/register", t.RegisterWebhook)
+	t.Bot.Handle("/test", t.TestWebhook)
 
 	t.Bot.Handle(telebot.OnText, func(c telebot.Context) error {
 		if c.Message().ReplyTo == nil {
@@ -885,6 +886,22 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	}
 
 	return c.Reply(messageT)
+}
+
+func (t Telegram) TestWebhook(c telebot.Context) error {
+	chatID := c.Chat().ID
+	log.Printf("Testing webhooks in chat %d", chatID)
+
+	sentAt := time.Now()
+	t.Hook.SendAllWebhookAsync(context.Background(), chatID, models.HookWebhookEnvelope{
+		Type: models.HookWebhookTypeTestWebhook,
+		Data: models.HookTestPayload{
+			Message:   "This is a test webhook message.",
+			Timestamp: &sentAt,
+		},
+	})
+
+	return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "WebhookTestDispatched"}}))
 }
 
 func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
