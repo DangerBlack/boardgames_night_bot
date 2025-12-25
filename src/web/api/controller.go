@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"gopkg.in/telebot.v3"
 )
@@ -75,7 +76,7 @@ func (c *Controller) InjectRoute() {
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
 	c.Router.POST("/events/:event_id/join", c.AddPlayer)
 	c.Router.GET("/bgg/search", c.BggSearch)
-	c.Router.POST("/webhooks/:webhook_id", c.VerifyWebhook(), c.ListenWebhook)
+	c.Router.POST("/webhooks/:webhook_id", c.VerifyWebhook(), c.CheckEventID(), c.ListenWebhook)
 }
 
 // BggSearch handles GET /bgg/search?name= for autocomplete
@@ -566,7 +567,7 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 
 		webhook, err := c.DB.GetWebhookByWebhookID(webhookID)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid chat webhook ID"})
 			return
 		}
 
@@ -630,13 +631,49 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 	}
 }
 
+func (c *Controller) CheckEventID() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var err error
+		var webhookEnvelope map[string]any
+		if err = ctx.ShouldBindBodyWith(&webhookEnvelope, binding.JSON); err != nil {
+			log.Println("failed to bind webhook json:", err)
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		if webhookEnvelope["data"] == nil {
+			data := webhookEnvelope["data"].(map[string]any)
+			var eventID string
+			if iEventID, ok := data["event_id"]; ok {
+				eventID = iEventID.(string)
+
+				var event *models.Event
+				if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
+					log.Println("failed to load event:", err)
+					ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+					return
+				}
+
+				chatID := ctx.GetInt64("chat_id")
+				if event.ChatID != chatID {
+					log.Printf("Webhook event chat ID %d does not match expected chat ID %d", event.ChatID, chatID)
+					ctx.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+					return
+				}
+			}
+		}
+
+		ctx.Next()
+	}
+}
+
 func (c *Controller) ListenWebhook(ctx *gin.Context) {
 	var err error
 	chatID := ctx.GetInt64("chat_id")
 	threadID := ctx.GetInt64("thread_id")
 
 	var webhookEnvelope models.HookWebhookEnvelope
-	if err = ctx.ShouldBindJSON(&webhookEnvelope); err != nil {
+	if err = ctx.ShouldBindBodyWith(&webhookEnvelope, binding.JSON); err != nil {
 		log.Println("failed to bind webhook json:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
 		return
@@ -653,6 +690,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		}
 
 		if payload.ChatID == 0 {
+			log.Printf("Setting missing ChatID in webhook payload to %d", chatID)
 			payload.ChatID = chatID
 		}
 
