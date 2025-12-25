@@ -153,7 +153,17 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 				"Example": eventNameT,
 			},
 		})
-		return c.Reply(usageT)
+
+		chatID := c.Chat().ID
+		btn := telebot.InlineButton{
+			Text: t.Localizer(c).MustLocalizeMessage(&i18n.Message{ID: "CreateEventWeb"}),
+			URL:  fmt.Sprintf("%s?startapp=create_event-%d-%d", t.Url.BotMiniAppURL, chatID, c.Message().ThreadID),
+		}
+
+		markup := &telebot.ReplyMarkup{}
+		markup.InlineKeyboard = [][]telebot.InlineButton{}
+		markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
+		return c.Reply(usageT, markup)
 	}
 	eventName := strings.Join(args[0:], " ")
 	userID := c.Sender().ID

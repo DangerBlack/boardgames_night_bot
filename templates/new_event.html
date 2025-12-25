@@ -1,0 +1,119 @@
+{{ define "new_event" }}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .CreateNewEvent }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        h1 { color: #333; text-align: center; }
+
+        .create-event-section { 
+            max-width: 600px; 
+            margin: 20px auto; 
+            padding: 15px; 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .create-event-section input {
+            width: 90%; 
+            padding: 10px; 
+            margin: 8px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 1em;
+        }
+
+        input[type=text] {
+            display: block;
+        }
+        input[type=number] {
+            display: block;
+        }
+
+        input[hidden] {
+            display: none;
+        }
+
+        button {
+            width: 95%; 
+            padding: 10px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            font-size: 1em; 
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 15px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+
+        .left-button {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        label[type=checkbox] {
+            display: grid;
+            grid-template-columns: 20px auto;
+        }
+    </style>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <h1>{{ .CreateNewEvent }}</h1>
+    <div id="auth">
+        <div class="create-event-section">
+            <p>{{ .Welcome}} <span id="username"></span></p>
+            <h2>{{ .EventDetails }}</h2>
+            <form action="/events" method="post">
+                <label for="eventName">{{ .EventName }}*</label>
+                <input type="text" id="eventName" name="name" placeholder="{{ .EventName }}" required>
+                <label for="eventDate">{{ .EventDate }}</label>
+                <input type="datetime-local" id="eventDate" name="starts_at" placeholder="DD-MM-YYYY HH:MM">
+
+                <label for="eventLocation">{{ .EventLocation }}</label>
+                <input type="text" id="eventLocation" name="location" placeholder="{{ .EventLocation }}">
+                <label type="checkbox"><input type="checkbox" name="is_locked"> {{ .OnlyAuthorCanAddGames }}</label>
+                <label type="checkbox"><input type="checkbox" name="allow_general_join" checked> {{ .AllowAnyoneToJoin }}</label>
+
+                <!-- Extra hidden fields to pass Telegram user and chat info -->
+                <input type="text" name="user_id" id="userID" required hidden>
+                <input type="text" name="user_name" id="userName" required hidden>
+                <input type="text" name="chat_id" id="chatID" value="{{.ChatID}}" required hidden>
+                <input type="text" name="thread_id"  id="threadID" value="{{.ThreadID}}" required hidden>
+                <button type="submit">{{ .CreateEvent }}</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        try
+        {
+            var user = window?.Telegram?.WebApp?.initDataUnsafe?.user;
+            var username = user.username || `${user.first_name} ${user.last_name}`;
+
+            if(user)
+            { 
+                document.getElementById("userID").value = user.id;
+                document.getElementById("userName").value = username;
+                document.getElementById("username").innerText  = username+"!";
+            }
+            else {
+                location.href = "/";
+            }
+        }    
+        catch(err)
+        {
+            alert(err);
+            location.href = "/";
+        }
+    </script>
+</body>
+</html>
+{{ end }}
