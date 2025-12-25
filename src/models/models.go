@@ -49,6 +49,43 @@ type BoardGame struct {
 	BggImageUrl  *string       `json:"bgg_image_url"`
 }
 
+type CreateEventRequest struct {
+	ChatID           int64      `json:"chat_id" form:"chat_id" binding:"required"`
+	ThreadID         *int64     `json:"thread_id" form:"thread_id"`
+	Name             string     `json:"name" form:"name" binding:"required"`
+	Location         *string    `json:"location" form:"location"`
+	StartsAt         *time.Time `json:"starts_at" form:"starts_at" time_format:"2006-01-02T15:04"`
+	UserID           int64      `json:"user_id" form:"user_id" binding:"required"`
+	UserName         string     `json:"user_name" form:"user_name" binding:"required"`
+	IsLocked         BoolOn     `json:"is_locked" form:"is_locked"`
+	AllowGeneralJoin BoolOn     `json:"allow_general_join" form:"allow_general_join"`
+}
+
+// BoolOn is a custom bool type that parses "on" as true (for HTML form checkboxes)
+type BoolOn bool
+
+func (b *BoolOn) UnmarshalText(text []byte) error {
+	s := string(text)
+	switch s {
+	case "on", "true", "1":
+		*b = true
+	default:
+		*b = false
+	}
+	return nil
+}
+
+func (b *BoolOn) UnmarshalParam(s string) error {
+	println("UnmarshalParam called with:", s)
+	switch s {
+	case "on", "true", "1":
+		*b = true
+	default:
+		*b = false
+	}
+	return nil
+}
+
 type AddGameRequest struct {
 	Name       string  `json:"name" form:"name" binding:"required"`
 	MaxPlayers *int    `json:"max_players" form:"max_players"`

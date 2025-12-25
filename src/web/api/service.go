@@ -37,7 +37,7 @@ func NewService(db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, languag
 	}
 }
 
-func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time) (*models.Event, error) {
+func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time, allowGeneralJoin bool) (*models.Event, error) {
 	var err error
 	fullText := name
 	log.Println("Full text for parsing:", fullText)
@@ -51,6 +51,14 @@ func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID i
 	}
 	log.Printf("Event created with id: %s", eventID)
 
+	if allowGeneralJoin {
+		log.Printf("User %s (%d) is allowed to join event %s without selecting a game", userName, userID, eventID)
+
+		if _, _, err = s.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
+			log.Println("failed to add game:", err)
+			return nil, errors.New("failed to add game")
+		}
+	}
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {

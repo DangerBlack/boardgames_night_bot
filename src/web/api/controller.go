@@ -17,9 +17,11 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DangerBlack/gobgg"
+	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -65,8 +67,9 @@ func (t Controller) Localizer(chatID *int64) *i18n.Localizer {
 
 func (c *Controller) InjectRoute() {
 	c.Router.GET("/", c.Index)
-	c.Router.GET("/events/:event_id", c.Event)
-	c.Router.GET("/events/:event_id/games/:game_id", c.Game)
+	c.Router.POST("/events", c.CreateEvent)
+	c.Router.GET("/events/:event_id", c.GetEvent)
+	c.Router.GET("/events/:event_id/games/:game_id", c.GetGame)
 	c.Router.POST("/events/:event_id/games/:game_id", c.UpdateGame)
 	c.Router.DELETE("/events/:event_id/games/:game_id", c.DeleteGame)
 	c.Router.POST("/events/:event_id/add-game", c.AddGame)
@@ -111,10 +114,52 @@ func (c *Controller) BggSearch(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, out)
 }
 
+// is uuid
+func IsValidUUID(u string) bool {
+	_, err := uuid.Parse(u)
+	return err == nil
+}
+
 func (c *Controller) Index(ctx *gin.Context) {
-	event_id := ctx.Query("tgWebAppStartParam")
-	if event_id != "" {
-		ctx.Redirect(http.StatusFound, fmt.Sprintf("/events/%s", event_id))
+	action := ctx.Query("tgWebAppStartParam")
+	log.Default().Printf("Index called with query param: %s", action)
+
+	if IsValidUUID(action) {
+		ctx.Redirect(http.StatusFound, fmt.Sprintf("/events/%s", action))
+		return
+	}
+
+	args := strings.Split(action, "-")
+	operation := args[0]
+
+	switch operation {
+	case "create_event":
+		log.Default().Printf("Rendering new_event with args: %v", args)
+		chatIDStr := args[1]
+		chatIDInt, err := strconv.ParseInt(chatIDStr, 10, 64)
+		if err != nil {
+			log.Default().Printf("Invalid chatID: %v", err)
+			ctx.HTML(http.StatusBadRequest, "error", gin.H{"Error": "Invalid chat ID"})
+			return
+		}
+		localizer := c.Localizer(&chatIDInt)
+		var threadID string
+		if len(args) > 2 {
+			threadID = args[2]
+		}
+		ctx.HTML(http.StatusOK, "new_event", gin.H{
+			"ChatID":                chatIDStr,
+			"ThreadID":              threadID,
+			"CreateNewEvent":        localizer.MustLocalizeMessage(&i18n.Message{ID: "WebCreateNewEvent"}),
+			"Welcome":               localizer.MustLocalizeMessage(&i18n.Message{ID: "WebWelcome"}),
+			"EventDetails":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebEventDetails"}),
+			"EventName":             localizer.MustLocalizeMessage(&i18n.Message{ID: "WebEventName"}),
+			"EventDate":             localizer.MustLocalizeMessage(&i18n.Message{ID: "WebEventDate"}),
+			"EventLocation":         localizer.MustLocalizeMessage(&i18n.Message{ID: "WebEventLocation"}),
+			"OnlyAuthorCanAddGames": localizer.MustLocalizeMessage(&i18n.Message{ID: "WebOnlyAuthorCanAddGames"}),
+			"AllowAnyoneToJoin":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAllowAnyoneToJoin"}),
+			"CreateEvent":           localizer.MustLocalizeMessage(&i18n.Message{ID: "WebCreateEvent"}),
+		})
 		return
 	}
 
@@ -140,7 +185,35 @@ func (c *Controller) NoRoute(ctx *gin.Context) {
 	})
 }
 
-func (c *Controller) Event(ctx *gin.Context) {
+func (c *Controller) CreateEvent(ctx *gin.Context) {
+	var err error
+
+	var newEvent models.CreateEventRequest
+	if err = ctx.ShouldBind(&newEvent); err != nil {
+		log.Println("failed to bind form:", err)
+		c.renderError(ctx, nil, nil, "Invalid submitted form data")
+		return
+	}
+
+	if newEvent.ThreadID != nil && *newEvent.ThreadID == 0 {
+		newEvent.ThreadID = nil
+	}
+
+	if newEvent.IsLocked {
+		newEvent.Name = fmt.Sprintf("🔒 %s", newEvent.Name)
+	}
+
+	var event *models.Event
+	if event, err = c.Service.CreateEvent(newEvent.ChatID, newEvent.ThreadID, nil, newEvent.UserID, newEvent.UserName, newEvent.Name, newEvent.Location, newEvent.StartsAt, bool(newEvent.AllowGeneralJoin)); err != nil {
+		log.Println("failed to create event:", err)
+		c.renderError(ctx, nil, nil, "Failed to create event")
+		return
+	}
+
+	ctx.Redirect(http.StatusFound, fmt.Sprintf("/events/%s", event.ID))
+}
+
+func (c *Controller) GetEvent(ctx *gin.Context) {
 	var err error
 	eventID := ctx.Param("event_id")
 
@@ -192,7 +265,7 @@ func (c *Controller) Event(ctx *gin.Context) {
 	})
 }
 
-func (c *Controller) Game(ctx *gin.Context) {
+func (c *Controller) GetGame(ctx *gin.Context) {
 	var err error
 	eventID := ctx.Param("event_id")
 	gameID, err2 := strconv.ParseInt(ctx.Param("game_id"), 10, 64)
@@ -590,7 +663,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		}
 
 		log.Printf("Processing new event webhook: %+v", payload)
-		if _, err = c.Service.CreateEvent(payload.ChatID, &threadID, &payload.ID, payload.UserID, payload.UserName, payload.Name, payload.Location, payload.StartsAt); err != nil {
+		if _, err = c.Service.CreateEvent(payload.ChatID, &threadID, &payload.ID, payload.UserID, payload.UserName, payload.Name, payload.Location, payload.StartsAt, false); err != nil {
 			log.Println("failed to add event from webhook:", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add event"})
 			return
