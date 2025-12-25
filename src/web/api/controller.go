@@ -680,6 +680,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 	var err error
 	chatID := ctx.GetInt64("chat_id")
 	threadID := ctx.GetInt64("thread_id")
+	webhookID := ctx.Param("webhook_id")
 
 	var webhookEnvelope models.HookWebhookEnvelope
 	if err = ctx.ShouldBindBodyWith(&webhookEnvelope, binding.JSON); err != nil {
@@ -808,7 +809,38 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to remove participant"})
 			return
 		}
+	case models.HookWebhookTypeSendMessage:
+		var payload *models.HookSendMessagePayload
+		if payload, err = Cast[models.HookSendMessagePayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
 
+		log.Printf("Processing send message webhook: %+v", payload)
+
+		name := ""
+		if payload.UserName != nil {
+			name = fmt.Sprintf(" @%s", *payload.UserName)
+		}
+		msg := fmt.Sprintf("🤖[%s%s] %s", webhookID[0:3], name, payload.Message)
+		_, err = c.Bot.Send(telebot.ChatID(chatID), msg, &telebot.SendOptions{
+			ParseMode: telebot.ModeHTML,
+			ThreadID:  int(threadID),
+		})
+		if err != nil {
+			log.Println("failed to send message from webhook:", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
+			return
+		}
+	case models.HookWebhookTypeTestWebhook:
+		log.Printf("Received test webhook for chat %d", chatID)
+		var payload *models.HookTestPayload
+		if payload, err = Cast[models.HookTestPayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Test webhook payload: %s", payload.Message)
 	default:
 		log.Printf("Unhandled webhook type: %s", webhookEnvelope.Type)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unhandled webhook type"})

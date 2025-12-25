@@ -12,6 +12,8 @@ const (
 	HookWebhookTypeDeleteGame        HookWebhookType = "delete_game"
 	HookWebhookTypeAddParticipant    HookWebhookType = "add_participant"
 	HookWebhookTypeRemoveParticipant HookWebhookType = "remove_participant"
+	HookWebhookTypeTestWebhook       HookWebhookType = "test"
+	HookWebhookTypeSendMessage       HookWebhookType = "send_message"
 )
 
 type HookWebhookEnvelope struct {
@@ -98,4 +100,17 @@ type HookRemoveParticipantPayload struct {
 	UserID    int64     `json:"user_id"`
 	UserName  string    `json:"user_name"`
 	RemovedAt time.Time `json:"removed_at"`
+}
+
+// --- Message payloads ---
+type HookSendMessagePayload struct {
+	UserID   *int64     `json:"user_id"`
+	UserName *string    `json:"user_name"`
+	Message  string     `json:"message"`
+	SentAt   *time.Time `json:"sent_at"`
+}
+
+type HookTestPayload struct {
+	Message   string     `json:"message"`
+	Timestamp *time.Time `json:"timestamp"`
 }

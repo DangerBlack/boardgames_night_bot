@@ -185,6 +185,38 @@ When a participant is removed from a game, you will receive a POST request with 
 }
 ```
 
+### Send Message
+
+Use this to send message to the chat where the webhooks is associated to:
+
+```json
+{
+    "type": "send_message",
+    "data": {
+        "id": "string",
+        "user_id": 123456,
+        "user_name": "string",
+        "message": "string",
+        "sent_at": "YYYY-MM-DDTHH:MM:SSZ"
+    }
+}
+```
+
+### Test
+
+Use this to test if the webhooks is properly configured. You can also run the special command `/test` to call the webhooks.
+
+```json
+{
+    "type": "test",
+    "data": {
+        "message": "Webhook test successful",
+        "timestamp": "YYYY-MM-DDTHH:MM:SSZ",
+    }
+}
+```
+
+
 ## Receiving Notifications
 
 Your endpoint must accept POST requests with a JSON body.
