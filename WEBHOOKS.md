@@ -227,6 +227,23 @@ Verify the HMAC signature using the secret sent to you by the bot.
 
 Handle the event types as needed in your system.
 
+## ID Format
+
+All IDs in webhook payloads are expected to be **UUID** or **ULID** encoded. 
+
+For example:
+
+```javascript
+5e8aa77f-e3fc-4d9d-9c71-34674ccd754a
+```
+
+Exceptions:
+
+- `user_id` and `chat_id` are integers.
+- In Telegram group chats, `chat_id` can be negative.
+
+This ensures consistency across events while accommodating platform-specific ID formats.
+
 
 ## Javascript example sending request
 
@@ -247,7 +264,7 @@ const webhookRegisteredURL = "YOUR_REGISTERED_WEBHOOK_URL";
 const payload = JSON.stringify({
   type: "send_message",
   data: {
-    id: "msg_001",
+    id: "d74bf1e7-b663-4a54-bd0f-db665c53ecae",
     user_id: 42,
     user_name: "Elia",
     message: "Game night starts soon!",
