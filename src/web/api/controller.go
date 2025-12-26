@@ -713,7 +713,21 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		log.Printf("Processing new event webhook: %+v", payload)
 		if _, err = c.Service.CreateEvent(payload.ChatID, &threadID, &payload.ID, payload.UserID, payload.UserName, payload.Name, payload.Location, payload.StartsAt, false); err != nil {
 			log.Println("failed to add event from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add event"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add event"})
+			return
+		}
+	case models.HookWebhookTypeDeleteEvent:
+		var payload *models.HookDeleteEventPayload
+		if payload, err = Cast[models.HookDeleteEventPayload](webhookEnvelope.Data); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		log.Printf("Processing delete event webhook: %+v", payload)
+
+		if err = c.Service.DeleteEvent(payload.EventID, payload.UserID, payload.UserName); err != nil {
+			log.Println("failed to delete event from webhook:", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete event"})
 			return
 		}
 	case models.HookWebhookTypeNewGame:
@@ -726,7 +740,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		log.Printf("Processing new game webhook: %+v", payload)
 		if _, _, err = c.Service.CreateGame(payload.EventID, &payload.ID, payload.UserID, payload.Name, &payload.MaxPlayers, payload.BGG.URL); err != nil {
 			log.Println("failed to add game from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add game"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add game"})
 			return
 		}
 	case models.HookWebhookTypeDeleteGame:
@@ -740,7 +754,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 
 		if _, _, err = c.Service.DeleteGame(payload.EventID, payload.ID, payload.UserID, payload.UserName); err != nil {
 			log.Println("failed to delete game from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to delete game"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete game"})
 			return
 		}
 	case models.HookWebhookTypeUpdateGame:
@@ -771,7 +785,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			Unlink:     unlink,
 		}); err != nil {
 			log.Println("failed to update game from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to update game"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update game"})
 			return
 		}
 	case models.HookWebhookTypeAddParticipant:
@@ -792,7 +806,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 
 		if _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName); err != nil {
 			log.Println("failed to add participant from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add participant"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
 			return
 		}
 	case models.HookWebhookTypeRemoveParticipant:
@@ -806,7 +820,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 
 		if err = c.Service.DeletePlayer(payload.EventID, payload.UserID); err != nil {
 			log.Println("failed to remove participant from webhook:", err)
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to remove participant"})
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove participant"})
 			return
 		}
 	case models.HookWebhookTypeSendMessage:
