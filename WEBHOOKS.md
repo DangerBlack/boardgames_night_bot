@@ -195,7 +195,6 @@ Use this to send message to the chat where the webhooks is associated to:
 {
     "type": "send_message",
     "data": {
-        "id": "string",
         "user_id": 123456,
         "user_name": "string",
         "message": "string",
@@ -264,7 +263,6 @@ const webhookRegisteredURL = "YOUR_REGISTERED_WEBHOOK_URL";
 const payload = JSON.stringify({
   type: "send_message",
   data: {
-    id: "d74bf1e7-b663-4a54-bd0f-db665c53ecae",
     user_id: 42,
     user_name: "Elia",
     message: "Game night starts soon!",
@@ -285,7 +283,7 @@ const signature = crypto
 
 console.log("x-ms-date:", msDate);
 console.log("x-ms-content-sha256:", payloadHash);
-console.log("x-bgnb-signature:", signature);
+console.log("X-BGNB-Signature:", signature);
 
 fetch(webhookRegisteredURL, {
   method: "POST",
@@ -310,7 +308,7 @@ function verifyBGNBSignature(secret, maxAgeSeconds = 300) {
   return function (req, res, next) {
     const dateHeader = req.headers["x-ms-date"];
     const receivedHash = req.headers["x-ms-content-sha256"];
-    const receivedSig = req.headers["x-bgnb-signature"];
+    const receivedSig = req.headers["X-BGNB-Signature"];
 
     if (!dateHeader || !receivedHash || !receivedSig) {
       return res.status(401).json({ error: "Missing auth headers" });
@@ -332,9 +330,10 @@ function verifyBGNBSignature(secret, maxAgeSeconds = 300) {
     }
 
     const toSign = dateHeader + ";" + computedHash;
+    const expectedSigBuf = Buffer.from(computedSig, "utf8");
     const computedSig = crypto.createHmac("sha256", secret).update(toSign).digest("base64");
 
-    if (computedSig !== receivedSig) {
+    if (expectedSigBuf.length !== receivedSigBuf.length || !crypto.timingSafeEqual(expectedSigBuf, receivedSigBuf)) {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
@@ -362,4 +361,4 @@ app.listen(3000, () => console.log("Webhook server ready"));
 
 Now register the listener to your chat using
 
-`register https://localhost:3000/webhook`
+`/register https://localhost:3000/webhook`

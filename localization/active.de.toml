@@ -61,19 +61,20 @@ AddGame = "Spiel hinzufügen"
 Players = "Spieler"
 EventHasBeenDeleted = "Das Ereignis <b>{{.Event}}</b> wurde von {{.Username}} gelöscht."
 GameHasBeenDeleted = "Das Spiel <b>{{.Game}}</b> wurde vom Ereignis <b>{{.Event}}</b> von {{.Username}} gelöscht."
-WebhookRegistered = "Webhook {{.WebhookUrl}} successfully registered."
-InvalidWebhookURL = "The webhook URL is not valid. Make sure it starts with http:// or https:// and try again."
-WebhookTestSendPrivateMessage = "I verify that I can send you private messages to correctly register the webhook."
-WebhookSecret = """Webhook created for chat <b>{{.ChatName}}</b>!
+WebhookRegistered = "Webhook {{.WebhookUrl}} erfolgreich registriert."
+InvalidWebhookURL = "Die Webhook-URL ist ungültig. Stelle sicher, dass sie mit http:// oder https:// beginnt und versuche es erneut."
+WebhookTestSendPrivateMessage = "Ich überprüfe, ob ich dir private Nachrichten senden kann, um den Webhook korrekt zu registrieren."
+WebhookSecret = """Webhook für den Chat <b>{{.ChatName}}</b> erstellt!
 
 🔑 <b>Secret:</b> <code>{{.Secret}}</code>
 🌐 <b>Webhook:</b>
  <code>{{.WebhookUrl}}</code>
-🔗 <b>Sie können signierte Anfragen an diese URL senden:</b>
+🔗 <b>Du kannst signierte Anfragen an diese URL senden:</b>
 <code>{{.CallbackUrl}}</code>
 
-Keep this secret in a safe place. Use it to validate the HMAC signature of received requests."""
-OnlyAdminsCanRegisterWebhook = "Only chat administrators can register a webhook."
+Bewahre dieses Secret an einem sicheren Ort auf. Verwende es, um die HMAC-Signatur der empfangenen Anfragen zu validieren."""
+OnlyAdminsCanRegisterWebhook = "Nur Chat-Administratoren können einen Webhook registrieren."
+
 WebhookTestDispatched = "Testnachricht an den Webhook gesendet."
 
 Open = "Hier klicken, um die Einstellungen für Ereignis {{.Name}} zu öffnen und beizutreten."
