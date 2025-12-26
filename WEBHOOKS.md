@@ -69,8 +69,8 @@ When an event is deleted, you will receive a POST request with the following JSO
 {
     "type": "delete_event",
     "data": {
-        "id": "string",
-        "name": "string",
+        "event_id": "string",
+        "user_id": 123456,
         "user_name": "string",
         "deleted_at": "YYYY-MM-DDTHH:MM:SSZ"
     }
