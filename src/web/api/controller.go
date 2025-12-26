@@ -439,7 +439,11 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 
 	if event, game, err = c.Service.DeleteGame(eventID, gameUUID, userID, username); err != nil {
 		log.Println("failed to delete game:", err)
-		c.renderError(ctx, &eventID, &event.ChatID, "Failed to delete game")
+		var chatID *int64
+		if event != nil {
+			chatID = &event.ChatID
+		}
+		c.renderError(ctx, &eventID, chatID, "Failed to delete game")
 		return
 	}
 
@@ -479,7 +483,11 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 
 	if event, game, err = c.Service.CreateGame(eventID, nil, bg.UserID, bg.Name, bg.MaxPlayers, bg.BggUrl); err != nil {
 		log.Println("failed to add game:", err)
-		c.renderError(ctx, &eventID, &event.ChatID, "Failed to add game")
+		var chatID *int64
+		if event != nil {
+			chatID = &event.ChatID
+		}
+		c.renderError(ctx, &eventID, chatID, "Failed to add game")
 		return
 	}
 
