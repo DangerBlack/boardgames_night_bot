@@ -56,6 +56,7 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BG
 		Hook: hook,
 		Service: NewService(db, bgg, bot, LanguageBundle, models.WebUrl{
 			BotMiniAppURL: botMiniAppURL,
+			BaseUrl:       baseUrl,
 		}),
 		Limiter: limiter.NewLimiter(5, 5),
 	}
@@ -351,7 +352,11 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 
 	if event, game, err = c.Service.UpdateGame(eventID, gameID, bg.UserID, bg); err != nil {
 		log.Println("failed to update game:", err)
-		c.renderError(ctx, &eventID, &event.ChatID, "Failed to update game")
+		var chatID *int64
+		if event != nil {
+			chatID = &event.ChatID
+		}
+		c.renderError(ctx, &eventID, chatID, "Failed to update game")
 		return
 	}
 
@@ -622,8 +627,8 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
-		reqTime, err := time.Parse(time.RFC1123, date)
-		if err != nil {
+		reqTime, parseErr := time.Parse(time.RFC1123, date)
+		if parseErr != nil {
 			ctx.AbortWithStatusJSON(400, gin.H{"error": "invalid date"})
 			return
 		}
@@ -650,7 +655,7 @@ func (c *Controller) CheckEventID() gin.HandlerFunc {
 			return
 		}
 
-		if webhookEnvelope["data"] == nil {
+		if webhookEnvelope["data"] != nil {
 			data := webhookEnvelope["data"].(map[string]any)
 			var eventID string
 			if iEventID, ok := data["event_id"]; ok {
@@ -867,12 +872,12 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 func Cast[T any](data any) (*T, error) {
 	payloadBytes, err := json.Marshal(data)
 	if err != nil {
-		log.Println("failed to marshal new game payload:", err)
+		log.Printf("failed to marshal payload for type %T: %v", (*T)(nil), err)
 		return nil, err
 	}
 	var payload T
 	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
-		log.Println("failed to unmarshal new game payload:", err)
+		log.Printf("failed to unmarshal payload for type %T: %v", (*T)(nil), err)
 		return nil, err
 	}
 	return &payload, nil

@@ -36,7 +36,7 @@ func NewWebhookClient(db *database.Database, timeout time.Duration, maxAttempt i
 		Client:             &http.Client{Timeout: timeout},
 		MaxAttempt:         maxAttempt,
 		FailureCache:       failureCache,
-		MaxFailuresAttempt: 5,
+		MaxFailuresAttempt: maxFailureAttempt,
 	}
 }
 
@@ -65,7 +65,7 @@ func (wc *WebhookClient) SendWebhookWithRetry(ctx context.Context, chatID int64,
 		log.Printf("In chat %d, attempt %d to send webhook to %s", chatID, attempt, w.Url)
 		if err := wc.sendWebhook(ctx, w, payload, secret); err != nil {
 			lastErr = err
-			time.Sleep(time.Second * time.Duration(attempt)) // Exponential backoff
+			time.Sleep(time.Second * time.Duration(1<<uint(attempt-1))) // Exponential backoff
 			continue
 		}
 		return nil

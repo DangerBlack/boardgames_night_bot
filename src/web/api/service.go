@@ -37,7 +37,7 @@ func NewService(db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, languag
 	}
 }
 
-func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time, allowGeneralJoin bool) (*models.Event, error) {
+func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time, allowGeneralJoin bool) (*models.Event, error) {
 	var err error
 	fullText := name
 	log.Println("Full text for parsing:", fullText)
@@ -75,9 +75,9 @@ func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID i
 	opts := &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 	}
-	if theadID != nil {
+	if threadID != nil {
 		opts.ReplyTo = &telebot.Message{
-			ID: int(*theadID),
+			ID: int(*threadID),
 		}
 	}
 

@@ -76,7 +76,6 @@ func (b *BoolOn) UnmarshalText(text []byte) error {
 }
 
 func (b *BoolOn) UnmarshalParam(s string) error {
-	println("UnmarshalParam called with:", s)
 	switch s {
 	case "on", "true", "1":
 		*b = true
