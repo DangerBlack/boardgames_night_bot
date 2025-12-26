@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -813,6 +814,11 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 
 	if !utils.IsValidURL(webhookUrl) {
 		log.Println("invalid webhook URL:", webhookUrl)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidWebhookURL"}}))
+	}
+
+	if utils.IsLocalURL(webhookUrl) && os.Getenv("ALLOW_LOCAL_WEBHOOKS") != "true" {
+		log.Println("local webhook URL not allowed:", webhookUrl)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidWebhookURL"}}))
 	}
 
