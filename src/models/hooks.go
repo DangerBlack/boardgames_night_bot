@@ -35,8 +35,8 @@ type HookNewEventPayload struct {
 }
 
 type HookDeleteEventPayload struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
+	EventID   string `json:"event_id"`
+	UserID    *int64 `json:"user_id"`
 	UserName  string `json:"user_name"`
 	DeletedAt string `json:"deleted_at"`
 }

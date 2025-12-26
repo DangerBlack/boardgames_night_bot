@@ -391,6 +391,16 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 	return event, nil
 }
 
+func (d *Database) DeleteEvent(id string) error {
+	query := `DELETE FROM events WHERE id = @id;`
+	_, err := d.db.Exec(query,
+		NamedArgs(map[string]any{
+			"id": id,
+		})...,
+	)
+	return err
+}
+
 func (d *Database) SelectGameIDByGameUUID(gameUUID string) (int64, error) {
 	query := `SELECT id FROM boardgames WHERE uuid = @uuid;`
 	var id int64

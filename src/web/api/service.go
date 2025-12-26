@@ -97,6 +97,61 @@ func (s *Service) CreateEvent(chatID int64, theadID *int64, id *string, userID i
 	return event, nil
 }
 
+func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) error {
+	var err error
+	var event *models.Event
+
+	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
+		log.Println("failed to load event:", err)
+		return errors.New("invalid event ID")
+	}
+
+	if event.Locked && (userID == nil || event.UserID != *userID) {
+		log.Println("event is locked")
+		return errors.New("unable to delete locked event")
+	}
+
+	if err = s.DB.DeleteEvent(eventID); err != nil {
+		log.Println("failed to delete event:", err)
+		return errors.New("failed to delete event")
+	}
+
+	to := &telebot.Chat{
+		ID: event.ChatID,
+	}
+
+	message := s.Localizer(&event.ChatID).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "EventHasBeenDeleted",
+		},
+		TemplateData: map[string]string{
+			"Username": userName,
+			"Event":    event.Name,
+		},
+	})
+
+	options := &telebot.SendOptions{
+		ParseMode: telebot.ModeHTML,
+		ReplyTo: &telebot.Message{
+			ID: int(*event.MessageID),
+		},
+	}
+
+	log.Printf("Sending delete message to chat %d: %s", to.ID, message)
+	if _, err = s.Bot.Send(to, message, options); err != nil {
+		log.Println("failed to send message:", err)
+	}
+
+	s.Bot.Delete(&telebot.Message{
+		ID: int(*event.MessageID),
+		Chat: &telebot.Chat{
+			ID: event.ChatID,
+		},
+	})
+
+	return nil
+}
+
 // Method signatures
 func (s *Service) CreateGame(
 	eventID string,
