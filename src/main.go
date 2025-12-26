@@ -120,6 +120,30 @@ func main() {
 		log.Fatal("the PORT is not set in .env file or is not a valid number")
 	}
 
+	httpTimeoutString := StringOrDefault(os.Getenv("HTTP_TIMEOUT"), "10s")
+	httpTimeoutDuration, err := time.ParseDuration(httpTimeoutString)
+	if err != nil {
+		log.Fatal("the HTTP_TIMEOUT is not set in .env file or is not a valid duration")
+	}
+
+	httpMaxAttemptString := StringOrDefault(os.Getenv("HTTP_MAX_ATTEMPT"), "3")
+	httpMaxAttempt, err := strconv.Atoi(httpMaxAttemptString)
+	if err != nil {
+		log.Fatal("the HTTP_MAX_ATTEMPT is not set in .env file or is not a valid number")
+	}
+
+	failureExpirationString := StringOrDefault(os.Getenv("FAILURE_EXPIRATION"), "10m")
+	failureExpirationDuration, err := time.ParseDuration(failureExpirationString)
+	if err != nil {
+		log.Fatal("the FAILURE_EXPIRATION is not set in .env file or is not a valid duration")
+	}
+
+	maxFailureAttemptsString := StringOrDefault(os.Getenv("MAX_FAILURE_ATTEMPTS"), "5")
+	maxFailureAttempts, err := strconv.Atoi(maxFailureAttemptsString)
+	if err != nil {
+		log.Fatal("the MAX_FAILURE_ATTEMPTS is not set in .env file or is not a valid number")
+	}
+
 	dbPath := StringOrDefault(os.Getenv("DB_PATH"), "./archive")
 
 	db := database.NewDatabase(dbPath)
@@ -152,7 +176,7 @@ func main() {
 		gobgg.SetBearerToken(bggToken),
 	)
 
-	wh := hooks.NewWebhookClient(db, 5*time.Second, 3)
+	wh := hooks.NewWebhookClient(db, httpTimeoutDuration, httpMaxAttempt, failureExpirationDuration, maxFailureAttempts)
 
 	telegram := telegram.Telegram{
 		Bot:            bot,

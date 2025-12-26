@@ -123,7 +123,7 @@ type WebUrl struct {
 }
 
 type Webhook struct {
-	ID        string
+	ID        int64
 	UUID      string
 	ChatID    int64
 	ThreadID  *int64
