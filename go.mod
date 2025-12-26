@@ -1,6 +1,6 @@
 module boardgame-night-bot
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
@@ -10,10 +10,12 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.24
 	golang.org/x/text v0.28.0
+	golang.org/x/time v0.14.0
 	gopkg.in/telebot.v3 v3.3.8
 )
 
 require (
+	github.com/bluele/gcache v0.0.2 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
