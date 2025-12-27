@@ -391,7 +391,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 			UserID:     bg.UserID,
 			UserName:   bg.UserName,
 			Name:       game.Name,
-			MaxPlayers: *bg.MaxPlayers,
+			MaxPlayers: int(game.MaxPlayers),
 			MessageID:  nil,
 			BGG: models.HookBGGInfo{
 				IsSet:    game.BggID != nil,
@@ -607,7 +607,7 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
-		log.Default().Printf("Verifying webhook %s at %s, secret [%s] with body: %s", webhookID, date, webhook.Secret, string(body))
+		log.Default().Printf("Verifying webhook %s at %s, secret [%s] with body: %d length", webhookID, date, webhook.Secret[0:3], len(body))
 
 		contentHash := sha256.Sum256(body)
 		contentHashHex := hex.EncodeToString(contentHash[:])
@@ -641,7 +641,7 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
-		if time.Since(reqTime) > 5*time.Minute {
+		if time.Since(reqTime) > 2*time.Minute {
 			ctx.AbortWithStatusJSON(401, gin.H{"error": "request too old"})
 			return
 		}

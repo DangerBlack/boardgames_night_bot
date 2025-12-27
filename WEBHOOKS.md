@@ -21,7 +21,7 @@ Replace `[url]` with your endpoint (must be publicly accessible).
 ## Security
 
 - Each webhook request includes the following headers for authentication:
-  - `x-ms-date`: The UTC date/time of the request (RFC1123 format).
+  - `x-ms-date`: The UTC date/time of the request (RFC1123 format), message older than 120 seconds will be discarded.
   - `x-ms-content-sha256`: The SHA256 hash (hex-encoded) of the JSON payload.
   - `X-BGNB-Signature`: The HMAC-SHA256 signature (base64-encoded) of the string:
   
@@ -291,7 +291,7 @@ fetch(webhookRegisteredURL, {
     "Content-Type": "application/json",
     "x-ms-date": msDate,
     "x-ms-content-sha256": payloadHash,
-    "x-bgnb-signature": signature
+    "X-BGNB-Signature": signature
   },
   body: payload
 }).then(console.log).catch(console.error);
@@ -304,7 +304,7 @@ To receive webhook events, create a POST route in Express and attach the signatu
 ```
 const crypto = require("crypto");
 
-function verifyBGNBSignature(secret, maxAgeSeconds = 300) {
+function verifyBGNBSignature(secret, maxAgeSeconds = 120) {
   return function (req, res, next) {
     const dateHeader = req.headers["x-ms-date"];
     const receivedHash = req.headers["x-ms-content-sha256"];
@@ -330,8 +330,9 @@ function verifyBGNBSignature(secret, maxAgeSeconds = 300) {
     }
 
     const toSign = dateHeader + ";" + computedHash;
-    const expectedSigBuf = Buffer.from(computedSig, "utf8");
+    const receivedSigBuf = Buffer.from(receivedSig, "base64");
     const computedSig = crypto.createHmac("sha256", secret).update(toSign).digest("base64");
+    const expectedSigBuf = Buffer.from(computedSig, "base64");
 
     if (expectedSigBuf.length !== receivedSigBuf.length || !crypto.timingSafeEqual(expectedSigBuf, receivedSigBuf)) {
       return res.status(401).json({ error: "Invalid signature" });

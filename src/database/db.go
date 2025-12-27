@@ -496,7 +496,7 @@ func (d *Database) UpdateBoardGamePlayerNumber(messageID int64, maxPlayers int) 
 	var boardGameID int64
 	var name string
 
-	query := `UPDATE boardgames SET max_players = @max_players where message_id = @message_id RETURNING id;`
+	query := `UPDATE boardgames SET max_players = @max_players where message_id = @message_id RETURNING id, name;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
