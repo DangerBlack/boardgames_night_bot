@@ -13,7 +13,7 @@ Verwendung:
 - Nutze /language [lan], um die Sprache des Bots einzustellen (en/it/de).
 - Nutze /location [Ort], um den Standardort des Chats festzulegen oder zu aktualisieren.
 - Nutze /register [URL], um einen Webhook zu registrieren.
-- Nutze /test , um eine Testnachricht an den registrierten Webhook zu senden.
+- Nutze /test um eine Testnachricht an den registrierten Webhook zu senden.
 
 Klicke auf die Buttons, um einem Spiel beizutreten oder es zu verlassen.
 Viel Spaß! 🎉
@@ -68,7 +68,7 @@ WebhookSecret = """Webhook für den Chat <b>{{.ChatName}}</b> erstellt!
 
 🔑 <b>Secret:</b> <code>{{.Secret}}</code>
 🌐 <b>Webhook:</b>
- <code>{{.WebhookUrl}}</code>
+<code>{{.WebhookUrl}}</code>
 🔗 <b>Du kannst signierte Anfragen an diese URL senden:</b>
 <code>{{.CallbackUrl}}</code>
 
