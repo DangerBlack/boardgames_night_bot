@@ -2,6 +2,7 @@ package api
 
 import (
 	"boardgame-night-bot/src/mocks"
+	"boardgame-night-bot/src/models"
 	"fmt"
 	"log"
 	"testing"
@@ -154,5 +155,73 @@ func TestCreateEventWithLocationAndStartTime(t *testing.T) {
 
 	if isBoardGameInserted {
 		t.Errorf("Did not expect board game to be inserted")
+	}
+}
+
+func TestDeleteEvent(t *testing.T) {
+	bundle := BeforeEach()
+	db := mocks.NewMockDatabase()
+	telegram := mocks.NewMockTelegramService()
+	service := &Service{
+		DB:             db,
+		Bot:            telegram,
+		LanguageBundle: bundle,
+	}
+
+	isEventDeleted := false
+
+	db.DeleteEventFunc = func(id string) error {
+		if id != "mock-event-id" {
+			t.Fatalf("Expected event ID 'mock-event-id', got '%s'", id)
+		}
+		isEventDeleted = true
+		return nil
+	}
+
+	eventMessageID := int64(11111)
+	db.SelectEventByEventIDFunc = func(eventID string) (*models.Event, error) {
+		return &models.Event{
+			ID:         eventID,
+			ChatID:     12345,
+			UserID:     67890,
+			UserName:   "test",
+			MessageID:  &eventMessageID,
+			Name:       "event",
+			BoardGames: []models.BoardGame{},
+			Locked:     false,
+		}, nil
+	}
+
+	isMessageSent := false
+	telegram.SendFunc = func(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+		isMessageSent = true
+		return &telebot.Message{}, nil
+	}
+
+	isMessageDeleted := false
+	telegram.DeleteFunc = func(msg telebot.Editable) error {
+		isMessageDeleted = true
+		if msg.(*telebot.Message).ID != int(eventMessageID) {
+			t.Fatalf("Expected message ID %d, got %d", eventMessageID, msg.(*telebot.Message).ID)
+		}
+		return nil
+	}
+
+	userID := int64(67890)
+	err := service.DeleteEvent("mock-event-id", &userID, "testuser")
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if !isEventDeleted {
+		t.Fatalf("Expected event to be deleted")
+	}
+
+	if !isMessageSent {
+		t.Fatalf("Expected Telegram notification to be sent")
+	}
+
+	if !isMessageDeleted {
+		t.Fatalf("Expected Telegram event message to be deleted")
 	}
 }

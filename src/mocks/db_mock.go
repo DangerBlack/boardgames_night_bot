@@ -10,6 +10,8 @@ type MockDatabase struct {
 	InsertEventFunc          func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
 	InsertBoardGameFunc      func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
 	UpdateEventMessageIDFunc func(eventID string, messageID int64) error
+	SelectEventByEventIDFunc func(eventID string) (*models.Event, error)
+	DeleteEventFunc          func(id string) error
 }
 
 func NewMockDatabase() *MockDatabase {
@@ -32,10 +34,16 @@ func (m *MockDatabase) SelectEvent(chatID int64) (*models.Event, error) {
 }
 
 func (m *MockDatabase) SelectEventByEventID(eventID string) (*models.Event, error) {
+	if m.SelectEventByEventIDFunc != nil {
+		return m.SelectEventByEventIDFunc(eventID)
+	}
 	return &models.Event{ID: eventID, Name: "Mock Event", ChatID: 12345}, nil
 }
 
 func (m *MockDatabase) DeleteEvent(id string) error {
+	if m.DeleteEventFunc != nil {
+		return m.DeleteEventFunc(id)
+	}
 	return nil
 }
 

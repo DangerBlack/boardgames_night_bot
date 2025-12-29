@@ -9,7 +9,8 @@ import (
 )
 
 type MockTelegramService struct {
-	SendFunc func(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error)
+	SendFunc   func(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error)
+	DeleteFunc func(msg telebot.Editable) error
 }
 
 func NewMockTelegramService() *MockTelegramService {
@@ -113,6 +114,9 @@ func (m *MockTelegramService) DefaultRights(forChannels bool) (*telebot.Rights, 
 }
 
 func (m *MockTelegramService) Delete(msg telebot.Editable) error {
+	if m.DeleteFunc != nil {
+		return m.DeleteFunc(msg)
+	}
 	return nil
 }
 
