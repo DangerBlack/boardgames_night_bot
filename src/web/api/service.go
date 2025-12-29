@@ -131,6 +131,11 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 		},
 	})
 
+	if event.MessageID == nil {
+		log.Println("event message id is nil, skipping telegram notification")
+		return errors.New("event message ID is nil")
+	}
+
 	options := &telebot.SendOptions{
 		ParseMode: telebot.ModeHTML,
 		ReplyTo: &telebot.Message{
@@ -143,12 +148,14 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 		log.Println("failed to send message:", err)
 	}
 
-	s.Bot.Delete(&telebot.Message{
+	if err = s.Bot.Delete(&telebot.Message{
 		ID: int(*event.MessageID),
 		Chat: &telebot.Chat{
 			ID: event.ChatID,
 		},
-	})
+	}); err != nil {
+		log.Println("failed to delete message:", err)
+	}
 
 	return nil
 }
