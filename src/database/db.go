@@ -19,6 +19,30 @@ type Database struct {
 	db *sql.DB
 }
 
+type DatabaseService interface {
+	CreateTables()
+	Close()
+	InsertEvent(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
+	SelectEvent(chatID int64) (*models.Event, error)
+	SelectEventByEventID(eventID string) (*models.Event, error)
+	DeleteEvent(id string) error
+	InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	UpdateEventMessageID(eventID string, messageID int64) error
+	UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
+	DeleteBoardGameByID(ID string) error
+	InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error)
+	RemoveParticipant(eventID string, userID int64) (string, int64, error)
+	HasBoardGameWithMessageID(messageID int64) bool
+	SelectGameIDByGameUUID(gameUUID string) (int64, error)
+	SelectGameUUIDByGameID(gameID int64) (string, error)
+	InsertChat(chatID int64, language *string, location *string) error
+	GetPreferredLanguage(chatID int64) string
+	InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error)
+	RemoveWebhook(webhookID int64) error
+	GetWebhooksByChatID(chatID int64) ([]models.Webhook, error)
+	GetWebhookByWebhookID(webhookID string) (*models.Webhook, error)
+}
+
 var ErrNoRows = errors.New("sql: no rows in result set")
 
 func NewDatabase(path string) *Database {

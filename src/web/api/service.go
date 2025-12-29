@@ -3,6 +3,7 @@ package api
 import (
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/models"
+	"boardgame-night-bot/src/telegram"
 	"boardgame-night-bot/src/utils"
 	"context"
 	"errors"
@@ -19,14 +20,14 @@ import (
 )
 
 type Service struct {
-	DB             *database.Database
+	DB             database.DatabaseService
 	BGG            *gobgg.BGG
-	Bot            *telebot.Bot
+	Bot            telegram.TelegramService
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
 }
 
-func NewService(db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
+func NewService(db database.DatabaseService, bgg *gobgg.BGG, bot telegram.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
 	return &Service{
 		DB:  db,
 		BGG: bgg,

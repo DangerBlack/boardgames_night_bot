@@ -77,7 +77,7 @@ func main() {
 	bundle := i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
-	lp, err := langpack.BuildLanguagePack()
+	lp, err := langpack.BuildLanguagePack(".")
 	if err != nil {
 		log.Fatal(err)
 	}
