@@ -3,6 +3,7 @@ package language
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -12,9 +13,9 @@ type LanguagePack struct {
 	Languages []string
 }
 
-func BuildLanguagePack() (*LanguagePack, error) {
+func BuildLanguagePack(dir string) (*LanguagePack, error) {
 	l := &LanguagePack{}
-	err := l.LoadLanguages()
+	err := l.LoadLanguages(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -22,9 +23,10 @@ func BuildLanguagePack() (*LanguagePack, error) {
 	return l, nil
 }
 
-func (l *LanguagePack) LoadLanguages() error {
+func (l *LanguagePack) LoadLanguages(dir string) error {
 	l.Languages = []string{}
-	entries, err := os.ReadDir("localization")
+	println("Loading available languages from:", path.Join(dir, "localization"))
+	entries, err := os.ReadDir(path.Join(dir, "localization"))
 	if err != nil {
 		return ErrorLanguageNotAvailable
 
