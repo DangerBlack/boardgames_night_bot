@@ -206,6 +206,10 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 		newEvent.Name = fmt.Sprintf("🔒 %s", newEvent.Name)
 	}
 
+	if newEvent.Location != nil && *newEvent.Location == "" {
+		newEvent.Location = nil
+	}
+
 	var event *models.Event
 	if event, err = c.Service.CreateEvent(newEvent.ChatID, newEvent.ThreadID, nil, newEvent.UserID, newEvent.UserName, newEvent.Name, newEvent.Location, newEvent.StartsAt, bool(newEvent.AllowGeneralJoin)); err != nil {
 		log.Println("failed to create event:", err)
