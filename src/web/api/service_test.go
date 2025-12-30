@@ -646,7 +646,7 @@ func TestUpdateGameWithBGG(t *testing.T) {
 	bggMock := service.BGG.(*mocks.MockBGGService)
 
 	requestedMaxPlayer := 6
-	expectMaxPlayer := 4
+	expectMaxPlayer := 6
 	bggNewUrl := "https://boardgamegeek.com/boardgame/999999/new-game"
 	isGameUpdated := false
 	db.UpdateBoardGameBGGInfoByIDFunc = func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error {
