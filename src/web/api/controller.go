@@ -36,29 +36,21 @@ type Controller struct {
 	BGG            bgg.BGGService
 	Bot            *telebot.Bot
 	LanguageBundle *i18n.Bundle
-	Url            models.WebUrl
 	Hook           *hooks.WebhookClient
 	Service        *Service
 	Limiter        *limiter.Limiter
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseUrl string) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, service *Service) *Controller {
 	return &Controller{
 		Router:         router,
 		DB:             db,
 		BGG:            bgg,
 		Bot:            bot,
 		LanguageBundle: LanguageBundle,
-		Url: models.WebUrl{
-			BaseUrl:       baseUrl,
-			BotMiniAppURL: botMiniAppURL,
-		},
-		Hook: hook,
-		Service: NewService(db, bgg, bot, LanguageBundle, models.WebUrl{
-			BotMiniAppURL: botMiniAppURL,
-			BaseUrl:       baseUrl,
-		}),
-		Limiter: limiter.NewLimiter(5, 5),
+		Hook:           hook,
+		Service:        service,
+		Limiter:        limiter.NewLimiter(5, 5),
 	}
 }
 
@@ -555,21 +547,15 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 	}
 
 	var participantID string
-	if participantID, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
+	var event *models.Event
+	var game *models.BoardGame
+	if participantID, event, game, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
 		log.Println("failed to add player:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{"message": "Player added."})
-
-	var event *models.Event
-	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
-		return
-	}
-
-	game := utils.PickGame(event, addPlayer.GameID)
 
 	c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeAddParticipant,
@@ -822,7 +808,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		if _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName); err != nil {
+		if _, _, _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName); err != nil {
 			log.Println("failed to add participant from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
 			return
@@ -836,7 +822,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 
 		log.Printf("Processing remove participant webhook: %+v", payload)
 
-		if err = c.Service.DeletePlayer(payload.EventID, payload.UserID); err != nil {
+		if _, _, _, err = c.Service.DeletePlayer(payload.EventID, payload.UserID); err != nil {
 			log.Println("failed to remove participant from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove participant"})
 			return

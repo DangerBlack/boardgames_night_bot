@@ -275,6 +275,7 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	b.uuid,
 	b.name,
 	b.max_players,
+	b.message_id,
 	b.bgg_id,
 	b.bgg_name,
 	b.bgg_url,
@@ -304,6 +305,7 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	b.uuid,
 	b.name,
 	b.max_players,
+	b.message_id,
 	b.bgg_id,
 	b.bgg_name,
 	b.bgg_url,
@@ -334,7 +336,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var boardGame models.BoardGame
 		var participant models.Participant
 
-		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID pgtype.Int8
+		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID pgtype.Int8
 		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
 		var startsAt pgtype.Timestamp
 
@@ -350,6 +352,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&boardGameUUID,
 			&boardGameName,
 			&boardGameMaxPlayers,
+			&bgMessageID,
 			&bggID,
 			&bggName,
 			&bggUrl,
@@ -373,6 +376,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 				UUID:        *StringOrNil(boardGameUUID),
 				Name:        *StringOrNil(boardGameName),
 				MaxPlayers:  *IntOrNil(boardGameMaxPlayers),
+				MessageID:   IntOrNil(bgMessageID),
 				BggID:       IntOrNil(bggID),
 				BggName:     StringOrNil(bggName),
 				BggUrl:      StringOrNil(bggUrl),

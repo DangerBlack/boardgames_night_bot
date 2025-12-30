@@ -42,6 +42,7 @@ type BoardGame struct {
 	UUID         string        `json:"uuid"`
 	Name         string        `json:"name"`
 	MaxPlayers   int64         `json:"max_players"`
+	MessageID    *int64        `json:"message_id"`
 	Participants []Participant `json:"participants"`
 	BggID        *int64        `json:"bgg_id"`
 	BggName      *string       `json:"bgg_name"`

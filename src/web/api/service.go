@@ -4,7 +4,7 @@ import (
 	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/models"
-	"boardgame-night-bot/src/telegram"
+	"boardgame-night-bot/src/telegram_interface"
 	"boardgame-night-bot/src/utils"
 	"context"
 	"errors"
@@ -23,12 +23,12 @@ import (
 type Service struct {
 	DB             database.DatabaseService
 	BGG            bgg.BGGService
-	Bot            telegram.TelegramService
+	Bot            telegram_interface.TelegramService
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
 }
 
-func NewService(db database.DatabaseService, bgg bgg.BGGService, bot telegram.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
+func NewService(db database.DatabaseService, bgg bgg.BGGService, bot telegram_interface.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
 	return &Service{
 		DB:  db,
 		BGG: bgg,
@@ -421,35 +421,49 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 	return event, game, nil
 }
 
-func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string) (string, error) {
+func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string) (string, *models.Event, *models.BoardGame, error) {
 	var err error
 	var participantID string
 	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username); err != nil {
 		log.Println("failed to add user to participants table:", err)
-		return "", errors.New("invalid form data")
+		return "", nil, nil, errors.New("invalid form data")
 	}
 
 	if _, err = s.updateTelegram(eventID); err != nil {
 		log.Println("failed to update telegram", err)
-		return "", err
+		return "", nil, nil, err
 	}
 
-	return participantID, nil
+	var event *models.Event
+	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
+		log.Println("failed to load game:", err)
+		return "", nil, nil, errors.New("invalid event ID")
+	}
+
+	game := utils.PickGame(event, gameID)
+
+	return participantID, event, game, nil
 }
 
-func (s *Service) DeletePlayer(eventID string, userID int64) error {
+func (s *Service) DeletePlayer(eventID string, userID int64) (string, *models.Event, *models.BoardGame, error) {
 	var err error
-	if _, _, err = s.DB.RemoveParticipant(eventID, userID); err != nil {
+	var participantID string
+	var gameID int64
+	var event *models.Event
+	var game *models.BoardGame
+	if participantID, gameID, err = s.DB.RemoveParticipant(eventID, userID); err != nil {
 		log.Println("failed to remove participant from webhook:", err)
-		return errors.New("failed to remove participant")
+		return "", nil, nil, errors.New("failed to remove participant")
 	}
 
-	if _, err = s.updateTelegram(eventID); err != nil {
+	if event, err = s.updateTelegram(eventID); err != nil {
 		log.Println("failed to update telegram", err)
-		return err
+		return "", nil, nil, err
 	}
 
-	return nil
+	game = utils.PickGame(event, gameID)
+
+	return participantID, event, game, nil
 }
 
 func (s *Service) updateTelegram(eventID string) (*models.Event, error) {

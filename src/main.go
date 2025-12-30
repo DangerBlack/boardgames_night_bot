@@ -7,6 +7,7 @@ import (
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/telegram"
 	"boardgame-night-bot/src/web"
+	"boardgame-night-bot/src/web/api"
 	"context"
 	"fmt"
 	"log"
@@ -182,17 +183,22 @@ func main() {
 
 	wh := hooks.NewWebhookClient(db, httpTimeoutDuration, httpMaxAttempt, failureExpirationDuration, maxFailureAttempts)
 
+	service := api.NewService(db, bggService, bot, bundle, models.WebUrl{
+		BotMiniAppURL: botMiniAppURL,
+		BaseUrl:       baseUrl,
+	})
+
 	telegram := telegram.Telegram{
 		Bot:            bot,
 		DB:             db,
-		BGG:            bggClient,
 		LanguageBundle: bundle,
 		LanguagePack:   lp,
 		Url: models.WebUrl{
 			BaseUrl:       baseUrl,
 			BotMiniAppURL: botMiniAppURL,
 		},
-		Hook: wh,
+		Hook:    wh,
+		Service: service,
 	}
 
 	log.Println("bot started")
@@ -201,7 +207,7 @@ func main() {
 
 	go func() {
 		log.Println("server started")
-		web.StartServer(port, db, bggService, bot, bundle, wh, botMiniAppURL, baseUrl)
+		web.StartServer(port, db, bggService, bot, bundle, wh, service)
 		log.Println("server stopped")
 	}()
 	go func() {
