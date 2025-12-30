@@ -3,6 +3,7 @@ package api
 import (
 	"boardgame-night-bot/src/mocks"
 	"boardgame-night-bot/src/models"
+	"context"
 	"fmt"
 	"log"
 	"testing"
@@ -16,7 +17,7 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-func BeforeEach() *i18n.Bundle {
+func BeforeEach() Service {
 	bundle := i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 
@@ -30,19 +31,27 @@ func BeforeEach() *i18n.Bundle {
 		bundle.MustLoadMessageFile(fmt.Sprintf("../../../localization/active.%s.toml", lang))
 	}
 
-	return bundle
-}
-
-func TestCreateEvent(t *testing.T) {
-	bundle := BeforeEach()
 	db := mocks.NewMockDatabase()
 	telegram := mocks.NewMockTelegramService()
+	bggMock := mocks.NewMockBGGService()
 	service := &Service{
 		DB:             db,
 		Bot:            telegram,
 		LanguageBundle: bundle,
+		BGG:            bggMock,
+		Url: models.WebUrl{
+			BaseUrl:       "http://example.com",
+			BotMiniAppURL: "https://t.me/boardgame_night_bot",
+		},
 	}
 
+	return *service
+}
+
+func TestCreateEvent(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	telegram := service.Bot.(*mocks.MockTelegramService)
 	db.InsertEventFunc = func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
 		if chatID != 12345 {
 			t.Fatalf("Expected chatID 12345, got %d", chatID)
@@ -120,13 +129,8 @@ func TestCreateEvent(t *testing.T) {
 }
 
 func TestCreateEventWithLocationAndStartTime(t *testing.T) {
-	bundle := BeforeEach()
-	db := mocks.NewMockDatabase()
-	service := &Service{
-		DB:             db,
-		Bot:            mocks.NewMockTelegramService(),
-		LanguageBundle: bundle,
-	}
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
 
 	db.InsertEventFunc = func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
 		if location == nil || *location != "Test Location" {
@@ -159,14 +163,9 @@ func TestCreateEventWithLocationAndStartTime(t *testing.T) {
 }
 
 func TestDeleteEvent(t *testing.T) {
-	bundle := BeforeEach()
-	db := mocks.NewMockDatabase()
-	telegram := mocks.NewMockTelegramService()
-	service := &Service{
-		DB:             db,
-		Bot:            telegram,
-		LanguageBundle: bundle,
-	}
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	telegram := service.Bot.(*mocks.MockTelegramService)
 
 	isEventDeleted := false
 
@@ -223,5 +222,86 @@ func TestDeleteEvent(t *testing.T) {
 
 	if !isMessageDeleted {
 		t.Fatalf("Expected Telegram event message to be deleted")
+	}
+}
+
+func TestCreateGame(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	bggMock := service.BGG.(*mocks.MockBGGService)
+	// telegram := service.Bot.(*mocks.MockTelegramService)
+
+	isGameInserted := false
+	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+		if eventID != "mock-event-id" {
+			t.Fatalf("Expected eventID 'mock-event-id', got '%s'", eventID)
+		}
+
+		if name != "Test Game" {
+			t.Fatalf("Expected game name 'Test Game', got '%s'", name)
+		}
+
+		if maxPlayers != 4 {
+			t.Fatalf("Expected maxPlayers 4, got %d", maxPlayers)
+		}
+
+		isGameInserted = true
+		return 1, "mock-game-uuid", nil
+	}
+
+	eventMessageID := int64(11111)
+	db.SelectEventByEventIDFunc = func(eventID string) (*models.Event, error) {
+		return &models.Event{
+			ID:        eventID,
+			ChatID:    12345,
+			UserID:    67890,
+			UserName:  "test",
+			MessageID: &eventMessageID,
+			Name:      "event",
+			BoardGames: []models.BoardGame{{
+				ID:         1,
+				UUID:       "mock-game-uuid",
+				Name:       "Test Game",
+				MaxPlayers: 4,
+			},
+			},
+			Locked: false,
+		}, nil
+	}
+
+	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+		if id != 0 {
+			t.Fatalf("Expected BGG ID 0, got %d", id)
+		}
+
+		if gameName != "Test Game" {
+			t.Fatalf("Expected game name 'Test Game', got '%s'", gameName)
+		}
+
+		// bggID := int64(123456)
+		bggName := "BGG Test Game"
+		bggUrl := "https://boardgamegeek.com/boardgame/123456"
+		bggImageUrl := "https://boardgamegeek.com/image/123456.jpg"
+		maxPlayers := 4
+
+		return &maxPlayers, &bggName, &bggUrl, &bggImageUrl, nil
+	}
+
+	maxPlayer := 4
+	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Test Game", &maxPlayer, nil)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if bg == nil {
+		t.Fatalf("Expected board game to be created, got nil")
+	}
+
+	if bg.UUID != "mock-game-uuid" {
+		t.Errorf("Expected game UUID 'mock-game-uuid', got '%s'", bg.UUID)
+	}
+
+	if !isGameInserted {
+		t.Errorf("Expected game to be inserted")
 	}
 }

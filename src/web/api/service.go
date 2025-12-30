@@ -1,6 +1,7 @@
 package api
 
 import (
+	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/models"
 	"boardgame-night-bot/src/telegram"
@@ -21,13 +22,13 @@ import (
 
 type Service struct {
 	DB             database.DatabaseService
-	BGG            *gobgg.BGG
+	BGG            bgg.BGGService
 	Bot            telegram.TelegramService
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
 }
 
-func NewService(db database.DatabaseService, bgg *gobgg.BGG, bot telegram.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
+func NewService(db database.DatabaseService, bgg bgg.BGGService, bot telegram.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
 	return &Service{
 		DB:  db,
 		BGG: bgg,
@@ -197,7 +198,7 @@ func (s *Service) CreateGame(
 
 		var bgMaxPlayers *int
 
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = models.ExtractGameInfo(bgCtx, s.BGG, id, name); err != nil {
+		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = s.BGG.ExtractGameInfo(bgCtx, id, name); err != nil {
 			log.Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
@@ -278,6 +279,8 @@ func (s *Service) CreateGame(
 		}
 	}
 
+	log.Default().Printf("Game %s created in event %s", name, event.Name)
+
 	return event, game, nil
 }
 
@@ -325,7 +328,7 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 
 		var bgMaxPlayers *int
 
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = models.ExtractGameInfo(bgCtx, s.BGG, id, game.Name); err != nil {
+		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = s.BGG.ExtractGameInfo(bgCtx, id, game.Name); err != nil {
 			log.Printf("Failed to get game %d: %v", id, err)
 		}
 		if bgMaxPlayers != nil {

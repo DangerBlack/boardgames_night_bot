@@ -18,6 +18,8 @@ import (
 
 	"time"
 
+	"boardgame-night-bot/src/bgg"
+
 	"github.com/DangerBlack/gobgg"
 
 	"github.com/BurntSushi/toml"
@@ -171,17 +173,19 @@ func main() {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	bgg := gobgg.NewBGGClient(
+	bggClient := gobgg.NewBGGClient(
 		gobgg.SetClient(client),
 		gobgg.SetBearerToken(bggToken),
 	)
+
+	bggService := bgg.NewBGGService(bggClient)
 
 	wh := hooks.NewWebhookClient(db, httpTimeoutDuration, httpMaxAttempt, failureExpirationDuration, maxFailureAttempts)
 
 	telegram := telegram.Telegram{
 		Bot:            bot,
 		DB:             db,
-		BGG:            bgg,
+		BGG:            bggClient,
 		LanguageBundle: bundle,
 		LanguagePack:   lp,
 		Url: models.WebUrl{
@@ -197,7 +201,7 @@ func main() {
 
 	go func() {
 		log.Println("server started")
-		web.StartServer(port, db, bgg, bot, bundle, wh, botMiniAppURL, baseUrl)
+		web.StartServer(port, db, bggService, bot, bundle, wh, botMiniAppURL, baseUrl)
 		log.Println("server stopped")
 	}()
 	go func() {
