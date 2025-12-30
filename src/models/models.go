@@ -241,6 +241,8 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 		markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
 	}
 
+	log.Default().Printf("Formatted message for event %s: %s", e.ID, msg)
+
 	return msg, markup
 }
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/models"
@@ -21,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DangerBlack/gobgg"
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
@@ -33,7 +33,7 @@ import (
 type Controller struct {
 	Router         *gin.RouterGroup
 	DB             *database.Database
-	BGG            *gobgg.BGG
+	BGG            bgg.BGGService
 	Bot            *telebot.Bot
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
@@ -42,7 +42,7 @@ type Controller struct {
 	Limiter        *limiter.Limiter
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseUrl string) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseUrl string) *Controller {
 	return &Controller{
 		Router:         router,
 		DB:             db,

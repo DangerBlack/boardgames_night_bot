@@ -1,19 +1,18 @@
 package web
 
 import (
+	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/web/api"
 	"fmt"
-
-	"github.com/DangerBlack/gobgg"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"gopkg.in/telebot.v3"
 )
 
-func StartServer(port int, db *database.Database, bgg *gobgg.BGG, bot *telebot.Bot, bundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseURl string) {
+func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, bundle *i18n.Bundle, hook *hooks.WebhookClient, botMiniAppURL string, baseURl string) {
 	var err error
 	router := gin.Default()
 
