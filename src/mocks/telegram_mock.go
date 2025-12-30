@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"boardgame-night-bot/src/telegram"
+	"boardgame-night-bot/src/telegram_interface"
 	"io"
 	"strings"
 
@@ -455,4 +455,4 @@ func (m *MockTelegramService) Webhook() (*telebot.Webhook, error) {
 	return &telebot.Webhook{}, nil
 }
 
-var _ telegram.TelegramService = &MockTelegramService{}
+var _ telegram_interface.TelegramService = &MockTelegramService{}

@@ -835,7 +835,7 @@ func TestAddPlayer(t *testing.T) {
 		return &telebot.Message{ID: 1}, nil
 	}
 
-	pid, err := service.AddPlayer(nil, eventID, gameID, userID, username)
+	pid, _, _, err := service.AddPlayer(nil, eventID, gameID, userID, username)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -900,7 +900,7 @@ func TestDeletePlayer(t *testing.T) {
 		return &telebot.Message{ID: 1}, nil
 	}
 
-	err := service.DeletePlayer(eventID, userID)
+	_, _, _, err := service.DeletePlayer(eventID, userID)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
