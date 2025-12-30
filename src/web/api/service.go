@@ -335,7 +335,7 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = s.BGG.ExtractGameInfo(bgCtx, id, game.Name); err != nil {
 			log.Printf("Failed to get game %d: %v", id, err)
 		}
-		if bgMaxPlayers != nil {
+		if bgMaxPlayers != nil && (bg.MaxPlayers == nil || *bg.MaxPlayers == 0) {
 			maxPlayers = int(*bgMaxPlayers)
 		}
 	}
