@@ -566,6 +566,10 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 	}
 
 	game := utils.PickGame(event, gameID)
+	if game == nil {
+		log.Printf("invalid game ID: %d", gameID)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
+	}
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeUpdateGame,
@@ -945,6 +949,10 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 	}
 
 	game := utils.PickGame(event, boardGameID)
+	if game == nil {
+		log.Printf("invalid game UUID: %d", boardGameID)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
+	}
 
 	if event.MessageID == nil {
 		log.Println("event message id is nil")
@@ -1034,6 +1042,10 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 	}
 
 	game := utils.PickGame(event, boardGameID)
+	if game == nil {
+		log.Printf("invalid game UUID: %d", boardGameID)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
+	}
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeRemoveParticipant,

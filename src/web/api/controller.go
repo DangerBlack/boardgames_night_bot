@@ -302,6 +302,11 @@ func (c *Controller) GetGame(ctx *gin.Context) {
 	localizer := c.Localizer(&event.ChatID)
 
 	game = utils.PickGame(event, gameID)
+	if game == nil {
+		log.Printf("invalid game ID: %d", gameID)
+		c.renderError(ctx, nil, nil, "Invalid game ID")
+		return
+	}
 
 	if game.Name == models.PLAYER_COUNTER {
 		game.Name = localizer.MustLocalizeMessage(&i18n.Message{ID: "JoinEvent"})
