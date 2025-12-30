@@ -300,6 +300,10 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 	}
 
 	game = utils.PickGame(event, gameID)
+	if game == nil {
+		log.Printf("invalid game ID: %d", gameID)
+		return nil, nil, errors.New("invalid game ID")
+	}
 
 	maxPlayers := int(game.MaxPlayers)
 	if bg.MaxPlayers != nil && *bg.MaxPlayers >= 0 {
@@ -347,6 +351,10 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 	}
 
 	game = utils.PickGame(event, gameID)
+	if game == nil {
+		log.Printf("invalid game ID: %d", gameID)
+		return nil, nil, errors.New("invalid game ID")
+	}
 
 	return event, game, nil
 }

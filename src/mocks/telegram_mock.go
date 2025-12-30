@@ -10,6 +10,7 @@ import (
 
 type MockTelegramService struct {
 	SendFunc   func(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error)
+	EditFunc   func(msg telebot.Editable, what interface{}, opts ...interface{}) (*telebot.Message, error)
 	DeleteFunc func(msg telebot.Editable) error
 }
 
@@ -153,6 +154,9 @@ func (m *MockTelegramService) Download(file *telebot.File, localFilename string)
 }
 
 func (m *MockTelegramService) Edit(msg telebot.Editable, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+	if m.EditFunc != nil {
+		return m.EditFunc(msg, what, opts...)
+	}
 	return &telebot.Message{}, nil
 }
 

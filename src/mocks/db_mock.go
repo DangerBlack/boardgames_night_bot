@@ -7,11 +7,15 @@ import (
 )
 
 type MockDatabase struct {
-	InsertEventFunc          func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
-	InsertBoardGameFunc      func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
-	UpdateEventMessageIDFunc func(eventID string, messageID int64) error
-	SelectEventByEventIDFunc func(eventID string) (*models.Event, error)
-	DeleteEventFunc          func(id string) error
+	InsertEventFunc                func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
+	InsertBoardGameFunc            func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	UpdateBoardGameBGGInfoByIDFunc func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
+	UpdateEventMessageIDFunc       func(eventID string, messageID int64) error
+	DeleteBoardGameByIDFunc        func(ID string) error
+	SelectEventByEventIDFunc       func(eventID string) (*models.Event, error)
+	DeleteEventFunc                func(id string) error
+	InsertParticipantFunc          func(id *string, eventID string, boardgameID, userID int64, userName string) (string, error)
+	RemoveParticipantFunc          func(eventID string, userID int64) (string, int64, error)
 }
 
 func NewMockDatabase() *MockDatabase {
@@ -61,14 +65,23 @@ func (m *MockDatabase) UpdateEventMessageID(eventID string, messageID int64) err
 	return nil
 }
 func (m *MockDatabase) UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error {
+	if m.UpdateBoardGameBGGInfoByIDFunc != nil {
+		return m.UpdateBoardGameBGGInfoByIDFunc(ID, maxPlayers, bggID, bggName, bggUrl, bggImageUrl)
+	}
 	return nil
 }
 
 func (m *MockDatabase) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error) {
+	if m.InsertParticipantFunc != nil {
+		return m.InsertParticipantFunc(id, eventID, boardgameID, userID, userName)
+	}
 	return "mock-participant-uuid", nil
 }
 
 func (m *MockDatabase) RemoveParticipant(eventID string, userID int64) (string, int64, error) {
+	if m.RemoveParticipantFunc != nil {
+		return m.RemoveParticipantFunc(eventID, userID)
+	}
 	return "mock-participant-uuid", 0, nil
 }
 
@@ -85,6 +98,9 @@ func (m *MockDatabase) SelectGameUUIDByGameID(gameID int64) (string, error) {
 }
 
 func (m *MockDatabase) DeleteBoardGameByID(ID string) error {
+	if m.DeleteBoardGameByIDFunc != nil {
+		return m.DeleteBoardGameByIDFunc(ID)
+	}
 	return nil
 }
 
