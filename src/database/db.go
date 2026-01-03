@@ -218,6 +218,8 @@ func (d *Database) MigrateToV3() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("database migration to v3 completed")
 }
 
 func (d *Database) Close() {

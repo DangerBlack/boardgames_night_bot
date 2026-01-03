@@ -309,7 +309,7 @@
                     return;
                 }
 
-                is_telegram_username = !!user.username;
+                const is_telegram_username = !!user.username;
                 fetch("{{ .Id }}/join", {
                     method: "POST",
                     headers: {
