@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"boardgame-night-bot/src/models"
 	"context"
 	"log"
 
@@ -8,21 +9,35 @@ import (
 )
 
 type MockBGGService struct {
-	ExtractGameInfoFunc func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error)
-	GetThingsFunc       func(ctx context.Context, setters []gobgg.GetOptionSetter) ([]gobgg.ThingResult, error)
-	SearchFunc          func(ctx context.Context, query string, setter []gobgg.SearchOptionSetter) ([]gobgg.SearchResult, error)
+	ExtractGameInfoFunc       func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error)
+	ExtractCachedGameInfoFunc func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error)
+	GetThingsFunc             func(ctx context.Context, setters []gobgg.GetOptionSetter) ([]gobgg.ThingResult, error)
+	SearchFunc                func(ctx context.Context, query string, setter []gobgg.SearchOptionSetter) ([]gobgg.SearchResult, error)
 }
 
 func NewMockBGGService() *MockBGGService {
 	return &MockBGGService{}
 }
 
-func (m *MockBGGService) ExtractGameInfo(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+func (m *MockBGGService) ExtractGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 	if m.ExtractGameInfoFunc != nil {
 		return m.ExtractGameInfoFunc(ctx, id, gameName)
 	}
 	log.Println("MockBGGService.ExtractGameInfo callback not configured")
-	return nil, nil, nil, nil, nil
+	return nil, nil
+}
+
+func (m *MockBGGService) ExtractCachedGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
+	if m.ExtractCachedGameInfoFunc != nil {
+		return m.ExtractCachedGameInfoFunc(ctx, id, gameName)
+	}
+
+	if m.ExtractGameInfoFunc != nil {
+		return m.ExtractGameInfoFunc(ctx, id, gameName)
+	}
+
+	log.Println("MockBGGService.ExtractCachedGameInfo callback not configured")
+	return nil, nil
 }
 
 func (m *MockBGGService) GetThings(ctx context.Context, setters ...gobgg.GetOptionSetter) ([]gobgg.ThingResult, error) {

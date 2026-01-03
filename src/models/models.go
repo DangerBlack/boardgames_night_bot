@@ -129,6 +129,13 @@ type Webhook struct {
 	CreatedAt time.Time
 }
 
+type BggInfo struct {
+	MaxPlayers *int
+	Name       *string
+	Url        *string
+	ImageUrl   *string
+}
+
 func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (string, telebot.InlineButton, error) {
 	msg := ""
 

@@ -271,7 +271,7 @@ func TestCreateGame(t *testing.T) {
 	}
 
 	expectToExtractGameInfo := false
-	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 		if id != 0 {
 			t.Fatalf("Expected BGG ID 0, got %d", id)
 		}
@@ -287,7 +287,12 @@ func TestCreateGame(t *testing.T) {
 		maxPlayers := 4
 		expectToExtractGameInfo = true
 
-		return &maxPlayers, &bggName, &bggUrl, &bggImageUrl, nil
+		return &models.BggInfo{
+			Name:       &bggName,
+			Url:        &bggUrl,
+			ImageUrl:   &bggImageUrl,
+			MaxPlayers: &maxPlayers,
+		}, nil
 	}
 
 	expectToSearchGame := false
@@ -387,7 +392,7 @@ func TestCreateGameWithoutBGGID(t *testing.T) {
 	}
 
 	bggID := int64(888888)
-	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 		if id != bggID {
 			t.Fatalf("Expected BGG ID %d, got %d", bggID, id)
 		}
@@ -402,7 +407,12 @@ func TestCreateGameWithoutBGGID(t *testing.T) {
 		bggImageUrl := "https://boardgamegeek.com/image/123456.jpg"
 		maxPlayers := 4
 
-		return &maxPlayers, &bggName, &bggUrl, &bggImageUrl, nil
+		return &models.BggInfo{
+			Name:       &bggName,
+			Url:        &bggUrl,
+			ImageUrl:   &bggImageUrl,
+			MaxPlayers: &maxPlayers,
+		}, nil
 	}
 
 	maxPlayer := 4
@@ -462,7 +472,7 @@ func TestCreateGameRespectMaxPlayer(t *testing.T) {
 	}
 
 	bggID := int64(888888)
-	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 		if id != bggID {
 			t.Fatalf("Expected BGG ID %d, got %d", bggID, id)
 		}
@@ -477,7 +487,12 @@ func TestCreateGameRespectMaxPlayer(t *testing.T) {
 		bggImageUrl := "https://boardgamegeek.com/image/123456.jpg"
 		maxPlayers := 4
 
-		return &maxPlayers, &bggName, &bggUrl, &bggImageUrl, nil
+		return &models.BggInfo{
+			Name:       &bggName,
+			Url:        &bggUrl,
+			ImageUrl:   &bggImageUrl,
+			MaxPlayers: &maxPlayers,
+		}, nil
 	}
 
 	bggUrl := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d/azul", bggID)
@@ -682,7 +697,7 @@ func TestUpdateGameWithBGG(t *testing.T) {
 	}
 
 	bggID := int64(999999)
-	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+	bggMock.ExtractGameInfoFunc = func(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 		if id != bggID {
 			t.Fatalf("Expected BGG ID %d, got %d", bggID, id)
 		}
@@ -696,7 +711,12 @@ func TestUpdateGameWithBGG(t *testing.T) {
 		bggImageUrl := "https://boardgamegeek.com/image/123456.jpg"
 		maxPlayers := 4
 
-		return &maxPlayers, &bggName, &bggUrl, &bggImageUrl, nil
+		return &models.BggInfo{
+			Name:       &bggName,
+			Url:        &bggUrl,
+			ImageUrl:   &bggImageUrl,
+			MaxPlayers: &maxPlayers,
+		}, nil
 	}
 
 	_, _, err := service.UpdateGame("mock-event-id", 123456, 891011, models.UpdateGameRequest{

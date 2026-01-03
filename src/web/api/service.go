@@ -196,14 +196,17 @@ func (s *Service) CreateGame(
 			return nil, nil, errors.New("invalid bgg url")
 		}
 
-		var bgMaxPlayers *int
-
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = s.BGG.ExtractGameInfo(bgCtx, id, name); err != nil {
+		var bgInfo *models.BggInfo
+		if bgInfo, err = s.BGG.ExtractCachedGameInfo(bgCtx, id, name); err != nil {
 			log.Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
+			bgName = bgInfo.Name
+			bgUrl = bgInfo.Url
+			bgImageUrl = bgInfo.ImageUrl
+
 			if finalMaxPlayers == nil || *finalMaxPlayers == 0 {
-				finalMaxPlayers = bgMaxPlayers
+				finalMaxPlayers = bgInfo.MaxPlayers
 			}
 		}
 	} else {
@@ -330,13 +333,19 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 			return nil, nil, errors.New("invalid bgg url")
 		}
 
-		var bgMaxPlayers *int
+		var bgInfo *models.BggInfo
 
-		if bgMaxPlayers, bgName, bgUrl, bgImageUrl, err = s.BGG.ExtractGameInfo(bgCtx, id, game.Name); err != nil {
+		if bgInfo, err = s.BGG.ExtractCachedGameInfo(bgCtx, id, game.Name); err != nil {
 			log.Printf("Failed to get game %d: %v", id, err)
-		}
-		if bgMaxPlayers != nil && (bg.MaxPlayers == nil || *bg.MaxPlayers == 0) {
-			maxPlayers = int(*bgMaxPlayers)
+		} else {
+			bgID = &id
+			bgName = bgInfo.Name
+			bgUrl = bgInfo.Url
+			bgImageUrl = bgInfo.ImageUrl
+
+			if bgInfo.MaxPlayers != nil && (bg.MaxPlayers == nil || *bg.MaxPlayers == 0) {
+				maxPlayers = int(*bgInfo.MaxPlayers)
+			}
 		}
 	}
 

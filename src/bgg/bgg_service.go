@@ -1,30 +1,56 @@
 package bgg
 
 import (
+	"boardgame-night-bot/src/models"
 	"context"
 	"fmt"
 	"log"
 
 	"github.com/DangerBlack/gobgg"
+	"github.com/bluele/gcache"
 )
 
 type BGGService interface {
-	ExtractGameInfo(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error)
+	ExtractGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error)
+	ExtractCachedGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error)
 	GetThings(ctx context.Context, setters ...gobgg.GetOptionSetter) ([]gobgg.ThingResult, error)
 	Search(ctx context.Context, query string, setter ...gobgg.SearchOptionSetter) ([]gobgg.SearchResult, error)
 }
 
 type bGGService struct {
-	BGG *gobgg.BGG
+	BGG   *gobgg.BGG
+	cache gcache.Cache
 }
 
 func NewBGGService(bggClient *gobgg.BGG) BGGService {
+	cache := gcache.New(1000).LRU().Build()
 	return &bGGService{
-		BGG: bggClient,
+		BGG:   bggClient,
+		cache: cache,
 	}
 }
 
-func (s *bGGService) ExtractGameInfo(ctx context.Context, id int64, gameName string) (*int, *string, *string, *string, error) {
+func (s *bGGService) ExtractCachedGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
+	cacheKey := fmt.Sprintf("bgg_info_%d", id)
+	if cached, err := s.cache.Get(cacheKey); err == nil {
+		if info, ok := cached.(*models.BggInfo); ok {
+			return info, nil
+		}
+	}
+
+	info, err := s.ExtractGameInfo(ctx, id, gameName)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.cache.Set(cacheKey, info); err != nil {
+		log.Printf("Failed to cache BGG info for game %d: %v", id, err)
+	}
+
+	return info, nil
+}
+
+func (s *bGGService) ExtractGameInfo(ctx context.Context, id int64, gameName string) (*models.BggInfo, error) {
 	var err error
 	var bgUrl, bgName, bgImageUrl *string
 	var maxPlayers *int
@@ -35,7 +61,7 @@ func (s *bGGService) ExtractGameInfo(ctx context.Context, id int64, gameName str
 
 	if things, err = s.BGG.GetThings(ctx, gobgg.GetThingIDs(id)); err != nil {
 		log.Printf("Failed to get game %d: %v", id, err)
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	if len(things) > 0 {
@@ -50,7 +76,14 @@ func (s *bGGService) ExtractGameInfo(ctx context.Context, id int64, gameName str
 		}
 	}
 
-	return maxPlayers, bgName, bgUrl, bgImageUrl, nil
+	info := models.BggInfo{
+		Name:       bgName,
+		Url:        bgUrl,
+		ImageUrl:   bgImageUrl,
+		MaxPlayers: maxPlayers,
+	}
+
+	return &info, nil
 }
 
 func (s *bGGService) GetThings(ctx context.Context, setters ...gobgg.GetOptionSetter) ([]gobgg.ThingResult, error) {
