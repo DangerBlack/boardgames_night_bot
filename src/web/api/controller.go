@@ -99,19 +99,24 @@ func (c *Controller) BggSearch(ctx *gin.Context) {
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].ID < results[j].ID
 	})
-	// Return top 10 results with name and bgg_url
-	var out []map[string]string
+	// Return top 100 results with name and bgg_url
+	var out []map[string]any
 	for i, r := range results {
-		if i >= 10 {
+		if i >= 100 {
 			break
 		}
 		url := ""
 		if r.ID > 0 {
 			url = fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", r.ID)
 		}
-		out = append(out, map[string]string{
+		if r.Name == "" {
+			continue
+		}
+
+		out = append(out, map[string]any{
 			"name":    r.Name,
 			"bgg_url": url,
+			"year":    r.YearPublished,
 		})
 	}
 	ctx.JSON(http.StatusOK, out)
