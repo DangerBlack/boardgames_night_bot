@@ -30,7 +30,7 @@ type DatabaseService interface {
 	UpdateEventMessageID(eventID string, messageID int64) error
 	UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
 	DeleteBoardGameByID(ID string) error
-	InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error)
+	InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error)
 	RemoveParticipant(eventID string, userID int64) (string, int64, error)
 	HasBoardGameWithMessageID(messageID int64) bool
 	SelectGameIDByGameUUID(gameUUID string) (int64, error)
@@ -212,6 +212,14 @@ func (d *Database) MigrateToV2() {
 	log.Println("database migration to v2 completed")
 }
 
+func (d *Database) MigrateToV3() {
+	var err error
+	_, err = d.addColumnIfNotExists("participants", "is_telegram_username", "BOOLEAN DEFAULT 0")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func (d *Database) Close() {
 	d.db.Close()
 	log.Println("database connection closed")
@@ -284,7 +292,8 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	p.id,
 	p.uuid,
 	p.user_id,
-	p.user_name
+	p.user_name,
+	p.is_telegram_username
 	FROM events e
 	LEFT JOIN boardgames b ON e.id = b.event_id
 	LEFT JOIN participants p ON b.id = p.boardgame_id
@@ -315,7 +324,8 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	p.id,
 	p.uuid,
 	p.user_id,
-	p.user_name
+	p.user_name,
+	p.is_telegram_username
 	FROM events e
 	LEFT JOIN boardgames b ON e.id = b.event_id
 	LEFT JOIN participants p ON b.id = p.boardgame_id
@@ -341,6 +351,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID pgtype.Int8
 		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
 		var startsAt pgtype.Timestamp
+		var isTelegramUsername pgtype.Bool
 
 		if err := rows.Scan(
 			&event.ID,
@@ -364,6 +375,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&participantUUID,
 			&participantUserID,
 			&participantUserName,
+			&isTelegramUsername,
 		); err != nil {
 			return nil, err
 		}
@@ -393,10 +405,11 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 		if IntOrNil(participantID) != nil {
 			participant = models.Participant{
-				ID:       *IntOrNil(participantID),
-				UUID:     *StringOrNil(participantUUID),
-				UserID:   *IntOrNil(participantUserID),
-				UserName: *StringOrNil(participantUserName),
+				ID:                 *IntOrNil(participantID),
+				UUID:               *StringOrNil(participantUUID),
+				UserID:             *IntOrNil(participantUserID),
+				UserName:           *StringOrNil(participantUserName),
+				IsTelegramUsername: *BoolOrNil(isTelegramUsername),
 			}
 
 			boardGameMap[boardGame.ID].Participants = append(boardGameMap[boardGame.ID].Participants, participant)
@@ -625,21 +638,22 @@ func (d *Database) HasBoardGameWithMessageID(messageID int64) bool {
 	return true
 }
 
-func (d *Database) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error) {
+func (d *Database) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error) {
 
 	if id == nil {
 		newID := uuid.New().String()
 		id = &newID
 	}
-	query := `INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name) VALUES (@uuid, @event_id, @boardgame_id, @user_id, @user_name) RETURNING uuid;`
+	query := `INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name, is_telegram_username) VALUES (@uuid, @event_id, @boardgame_id, @user_id, @user_name, @is_telegram_username) RETURNING uuid;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
-			"uuid":         id,
-			"event_id":     eventID,
-			"boardgame_id": boardgameID,
-			"user_id":      userID,
-			"user_name":    userName,
+			"uuid":                 id,
+			"event_id":             eventID,
+			"boardgame_id":         boardgameID,
+			"user_id":              userID,
+			"user_name":            userName,
+			"is_telegram_username": isTelegramUsername,
 		})...,
 	).Scan(id); err != nil {
 		return "", err
@@ -854,6 +868,15 @@ func ParseError(err error) error {
 func TimeOrNil(t pgtype.Timestamp) *time.Time {
 	if t.Valid {
 		v := t.Time
+		return &v
+	}
+
+	return nil
+}
+
+func BoolOrNil(b pgtype.Bool) *bool {
+	if b.Valid {
+		v := b.Bool
 		return &v
 	}
 

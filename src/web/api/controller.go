@@ -559,7 +559,7 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 	var participantID string
 	var event *models.Event
 	var game *models.BoardGame
-	if participantID, event, game, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName); err != nil {
+	if participantID, event, game, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName, addPlayer.IsTelegramUsername); err != nil {
 		log.Println("failed to add player:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
@@ -818,7 +818,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		if _, _, _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName); err != nil {
+		if _, _, _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName, false); err != nil {
 			log.Println("failed to add participant from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
 			return
