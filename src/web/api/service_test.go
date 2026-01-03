@@ -801,6 +801,69 @@ func TestDeleteGame(t *testing.T) {
 	}
 }
 
+func TestDeleteLockedGame(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	telegram := service.Bot.(*mocks.MockTelegramService)
+
+	// Setup mock event and game
+	eventMessageID := int64(11111)
+	eventID := "mock-event-id"
+	gameUUID := "mock-game-uuid"
+	hostID := int64(67890)
+	userID := int64(80000)
+	username := "testuser"
+	gameName := "Test Game"
+	isGameDeleted := false
+
+	db.SelectEventByEventIDFunc = func(id string) (*models.Event, error) {
+		return &models.Event{
+			ID:        eventID,
+			ChatID:    12345,
+			UserID:    hostID,
+			UserName:  username,
+			MessageID: &eventMessageID,
+			Name:      "event",
+			BoardGames: []models.BoardGame{{
+				ID:         123456,
+				UUID:       gameUUID,
+				Name:       gameName,
+				MaxPlayers: 4,
+			}},
+			Locked: true,
+		}, nil
+	}
+	db.DeleteBoardGameByIDFunc = func(id string) error {
+		if id != gameUUID {
+			t.Fatalf("Expected game UUID %s, got %s", gameUUID, id)
+		}
+		isGameDeleted = true
+		return nil
+	}
+
+	isExpectedToSend := false
+	telegram.SendFunc = func(to telebot.Recipient, what interface{}, options ...interface{}) (*telebot.Message, error) {
+		isExpectedToSend = true
+		return &telebot.Message{ID: 1}, nil
+	}
+
+	// Act
+	_, _, err := service.DeleteGame(eventID, gameUUID, userID, username)
+
+	// Assert
+	if err == nil {
+		t.Fatalf("Expected error, got nil")
+	}
+
+	if isGameDeleted {
+		t.Fatalf("Did not expect game to be deleted")
+	}
+
+	if isExpectedToSend {
+		t.Fatalf("Did not expect Telegram message to be sent")
+	}
+}
+
 func TestAddPlayer(t *testing.T) {
 	service := BeforeEach()
 	db := service.DB.(*mocks.MockDatabase)
