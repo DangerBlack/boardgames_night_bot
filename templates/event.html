@@ -208,6 +208,10 @@
 
 <body>
     <h1>📆 {{ .Title }}</h1>
+
+    {{ if .Host }}
+    <p><b>👑 {{ .Host }}</b></p>
+    {{ end }}
     {{ if .StartsAt }}
     <p><b>⏰ {{ .StartsAt }}</b></p>
     {{ end }}

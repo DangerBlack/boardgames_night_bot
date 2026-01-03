@@ -262,6 +262,7 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 	ctx.HTML(http.StatusOK, "event", gin.H{
 		"Id":             event.ID,
 		"Title":          event.Name,
+		"Host":           event.UserName,
 		"StartsAt":       event.FormatStartAt(),
 		"Location":       event.Location,
 		"Games":          event.BoardGames,
