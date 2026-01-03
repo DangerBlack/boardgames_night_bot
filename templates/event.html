@@ -1,48 +1,93 @@
 {{ define "event" }}
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        h1 { color: #333; text-align: center; }
-        .game-list { max-width: 600px; margin: 0 auto; }
-        .game { 
-            background: #fff; 
-            margin-bottom: 15px; 
-            padding: 15px; 
-            border: 1px solid #ddd; 
-            border-radius: 10px; 
-            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); 
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .game-list {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .game {
+            background: #fff;
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
             display: grid;
             grid-template-columns: 1fr 5fr;
         }
-        .game img { width: 60px; height: 60px; border-radius: 5px; margin-right: 15px; }
-        .game .blurred-image { filter: blur(2px); }
-        .game a { text-decoration: none; color: #007bff; font-weight: bold; }
-        .game p { margin: 5px 0; }
-        .participants { margin-left: 20px; font-style: italic; color: #555; }
-        .updated { text-align: center; font-size: 0.9em; color: #666; margin-top: 20px; }
+
+        .game img {
+            width: 60px;
+            height: 60px;
+            border-radius: 5px;
+            margin-right: 15px;
+        }
+
+        .game .blurred-image {
+            filter: blur(2px);
+        }
+
+        .game a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        .game p {
+            margin: 5px 0;
+        }
+
+        .participants {
+            margin-left: 20px;
+            font-style: italic;
+            color: #555;
+        }
+
+        .updated {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 20px;
+        }
+
         /* Add Game Form Styling */
-        .add-game { 
-            max-width: 600px; 
-            margin: 20px auto; 
-            padding: 15px; 
-            background: #fff; 
-            border-radius: 10px; 
+        .add-game {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 15px;
+            background: #fff;
+            border-radius: 10px;
             box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
+
         .add-game input {
-            width: 90%; 
-            padding: 10px; 
-            margin: 8px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 5px; 
+            width: 90%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
             font-size: 1em;
         }
+
         /* Autocomplete styles */
         .autocomplete-items {
             position: absolute;
@@ -53,28 +98,34 @@
             border-top: none;
             max-height: 220px;
             overflow-y: auto;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
             border-radius: 0 0 8px 8px;
             z-index: 100;
         }
+
         .autocomplete-items div {
             padding: 10px 16px;
             cursor: pointer;
             border-bottom: 1px solid #eee;
             transition: background 0.2s;
         }
+
         .autocomplete-items div:last-child {
             border-bottom: none;
         }
-        .autocomplete-items div:hover, .autocomplete-items .selected {
+
+        .autocomplete-items div:hover,
+        .autocomplete-items .selected {
             background: #f0f8ff;
         }
+
         .autocomplete-loading {
             text-align: left;
             padding: 10px 16px;
             color: #888;
             font-style: italic;
         }
+
         .autocomplete-spinner {
             display: inline-block;
             width: 18px;
@@ -86,21 +137,29 @@
             vertical-align: middle;
             margin-right: 8px;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         .add-game button {
-            width: 95%; 
-            padding: 10px; 
-            background: #007bff; 
-            color: white; 
-            border: none; 
-            border-radius: 5px; 
-            font-size: 1em; 
+            width: 95%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
             cursor: pointer;
             transition: background 0.3s;
         }
+
         .add-game button:hover {
             background: #0056b3;
         }
@@ -138,10 +197,15 @@
             padding: 8px 12px;
         }
 
-        #auth { max-width: 600px; margin: 0 auto; text-align: center; }
+        #auth {
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
     </style>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
     <h1>📆 {{ .Title }}</h1>
     {{ if .StartsAt }}
@@ -150,7 +214,7 @@
     {{ if .Location }}
     <p><b>📍 {{ .Location }}</b></p>
     {{ end }}
-    
+
     {{ $join := .Join }}
     {{ $players := .Players }}
     {{ $noParticipants := .NoParticipants }}
@@ -164,45 +228,47 @@
             <img class="blurred-image" src="https://picsum.photos/200" alt="Placeholder for  {{ .Name }}">
             {{ end }}
             <div class="game-info">
-                <p>🎲  
+                <p>🎲
                     {{ if .BggUrl }}
                     - <a href="{{ .BggUrl }}">{{ .BggName }}</a>
                     {{ end }}
                 </p>
                 <p>
-                    <strong>[{{ .Name }}]</strong> 
+                    <strong>[{{ .Name }}]</strong>
                     (
-                        {{ if ne .MaxPlayers -1 }}
-                            {{ len .Participants }}/{{ .MaxPlayers }} {{ $players }}
-                        {{ else }}
-                            {{ len .Participants }} {{ $players }}
-                        {{ end }}
+                    {{ if ne .MaxPlayers -1 }}
+                    {{ len .Participants }}/{{ .MaxPlayers }} {{ $players }}
+                    {{ else }}
+                    {{ len .Participants }} {{ $players }}
+                    {{ end }}
                     )
                 </p>
                 <div class="participants">
                     {{ if .Participants }}
-                        {{ range .Participants }}
-                        <p>- {{ .UserName }}</p>
-                        {{ end }}
+                    {{ range .Participants }}
+                    <p>- {{ .UserName }}</p>
+                    {{ end }}
                     {{ else }}
-                        <p>- {{ $noParticipants }}</p>
+                    <p>- {{ $noParticipants }}</p>
                     {{ end }}
                 </div>
                 <div class="left-button">
-                    <button class="edit" value="{{ .ID }}" onclick="window.location='{{ $eventID }}/games/{{ .ID }}'">🔧</button>
+                    <button class="edit" value="{{ .ID }}"
+                        onclick="window.location='{{ $eventID }}/games/{{ .ID }}'">🔧</button>
                     <button class="join" value="{{ .ID }}">{{ $join }}</button>
                 </div>
             </div>
         </div>
         {{ end }}
     </div>
-    
+
     <div id="auth">
         <p>{{ .Welcome }} <span id="username"></span></p>
         <div class="add-game">
             <h3>{{ .AddNewGame }}</h3>
             <form action="{{ .Id }}/add-game" method="post" autocomplete="off">
-                <input type="text" id="gameNameInput" name="name" placeholder="{{ .GameName }}*" required title="Enter the game name" alt="Enter the game name" autocomplete="off">
+                <input type="text" id="gameNameInput" name="name" placeholder="{{ .GameName }}*" required
+                    title="Enter the game name" alt="Enter the game name" autocomplete="off">
                 <div id="autocomplete-list" class="autocomplete-items" style="position:relative;z-index:10;"></div>
                 <input type="text" id="bggUrlInput" name="bgg_url" placeholder="BGG URL">
                 <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
@@ -214,8 +280,7 @@
     <p class="updated">{{ .UpdatedAt }}</p>
     <script>
         var user = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-        if(user)
-        { 
+        if (user) {
             document.getElementById("username").innerText = user.username || `${user.first_name} ${user.last_name}`;
             document.getElementById("userID").value = user.id;
         }
@@ -232,93 +297,116 @@
         });
 
         document.querySelectorAll(".join").forEach(button => {
-            button.addEventListener("click", function(event) {
+            button.addEventListener("click", function (event) {
                 const game_id = parseInt(event.target.getAttribute("value"), 10);
 
                 if (!user) {
                     alert("Please login to join a game");
                     return;
                 }
-                
+
                 fetch("{{ .Id }}/join", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({ 
-                        game_id, 
+                    body: JSON.stringify({
+                        game_id,
                         user_id: user.id,
                         user_name: user.username || `${user.first_name} ${user.last_name}`,
                     })
                 })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error("Network response was not ok");
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("Success:", data);
-                    location.reload(); // Reload the page after successful request
-                })
-                .catch(error => {
-                    console.error("Error:", error);
-                });
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error("Network response was not ok");
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log("Success:", data);
+                        location.reload(); // Reload the page after successful request
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                    });
             });
         });
 
-        // --- Autocomplete for game name ---
         const gameNameInput = document.getElementById('gameNameInput');
         const bggUrlInput = document.getElementById('bggUrlInput');
         const autocompleteList = document.getElementById('autocomplete-list');
 
-
         let debounceTimeout;
-        gameNameInput.addEventListener('input', function() {
+        let lastRequestId = 0;
+
+        gameNameInput.addEventListener('input', function () {
             const query = this.value.trim();
             if (debounceTimeout) clearTimeout(debounceTimeout);
+
             if (!query) {
                 autocompleteList.innerHTML = '';
                 return;
             }
-            autocompleteList.innerHTML = `<div class="autocomplete-loading"><span class="autocomplete-spinner"></span>Loading...</div>`;
+
+            autocompleteList.innerHTML = `<div class="autocomplete-loading">Loading...</div>`;
+
             debounceTimeout = setTimeout(() => {
-                fetch(`/bgg/search?name=${encodeURIComponent(query)}`)
+                const requestId = ++lastRequestId;
+
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+
+                fetch(`/bgg/search?name=${encodeURIComponent(query)}`, { signal: controller.signal })
                     .then(res => res.json())
                     .then(data => {
-                        autocompleteList.innerHTML = '';
-                        if (Array.isArray(data) && data.length > 0) {
-                            data.forEach(game => {
-                                if (!game.name)
-                                    return;
+                        clearTimeout(timeout);
+                        if (requestId !== lastRequestId) return;
 
-                                const item = document.createElement('div');
-                                item.textContent = game.name;
-
-                                item.addEventListener('mousedown', function(e) {
-                                    gameNameInput.value = game.name;
-                                    if (game.bgg_url) bggUrlInput.value = game.bgg_url;
-                                    autocompleteList.innerHTML = '';
-                                });
-                                autocompleteList.appendChild(item);
-                            });
-                        } else {
+                        if (!Array.isArray(data) || data.length === 0) {
                             autocompleteList.innerHTML = '<div class="autocomplete-loading">No results found</div>';
+                            return;
                         }
+
+                        autocompleteList.innerHTML = '';
+                        data.forEach(game => {
+                            if (!game.name) return;
+
+                            const item = document.createElement('div');
+                            item.textContent = `${game.name} ${game.year ? `(${game.year})` : ''}`;
+
+                            item.addEventListener('mousedown', () => {
+                                gameNameInput.value = game.name;
+                                if (game.bgg_url) bggUrlInput.value = game.bgg_url;
+                                autocompleteList.innerHTML = '';
+                            });
+
+                            autocompleteList.appendChild(item);
+                        });
                     })
-                    .catch(() => {
-                        autocompleteList.innerHTML = '<div class="autocomplete-loading">Error loading suggestions</div>';
+                    .catch(err => {
+                        clearTimeout(timeout);
+                        if (requestId !== lastRequestId) return;
+
+                        if (err.name === 'AbortError') {
+                            console.warn("BGG request timeout, ignored");
+                            return;
+                        }
+
+                        if (requestId === lastRequestId && autocompleteList.children.length === 0) {
+                            autocompleteList.innerHTML = '<div class="autocomplete-loading">Error loading suggestions</div>';
+                        }
                     });
             }, 250);
         });
 
         // Hide autocomplete when clicking outside
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             if (!autocompleteList.contains(e.target) && e.target !== gameNameInput) {
                 autocompleteList.innerHTML = '';
             }
         });
     </script>
 </body>
+
 </html>
 {{ end }}
