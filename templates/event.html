@@ -309,6 +309,7 @@
                     return;
                 }
 
+                is_telegram_username = !!user.username;
                 fetch("{{ .Id }}/join", {
                     method: "POST",
                     headers: {
@@ -318,6 +319,7 @@
                         game_id,
                         user_id: user.id,
                         user_name: user.username || `${user.first_name} ${user.last_name}`,
+                        is_telegram_username,
                     })
                 })
                     .then(response => {

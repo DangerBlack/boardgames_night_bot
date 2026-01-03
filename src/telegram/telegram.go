@@ -73,17 +73,17 @@ func (t Telegram) SetupHandlers() {
 	})
 }
 
-func DefineUsername(user *telebot.User) string {
+func DefineUsername(user *telebot.User) (string, bool) {
 	if user.Username != "" {
-		return user.Username
+		return user.Username, true
 	}
 
 	username := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	if username != " " {
-		return username
+		return username, false
 	}
 
-	return fmt.Sprintf("user_%d", user.ID)
+	return fmt.Sprintf("user_%d", user.ID), false
 }
 
 func (t Telegram) Localizer(c telebot.Context) *i18n.Localizer {
@@ -167,7 +167,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	}
 	eventName := strings.Join(args[0:], " ")
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	chatID := c.Chat().ID
 	var threadID *int64
 	if c.Message().ThreadID != 0 {
@@ -293,7 +293,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	gameName := strings.Join(args[0:], " ")
 	log.Printf("Adding game: %s in chat id %d", gameName, chatID)
 
@@ -390,7 +390,7 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 	var err error
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	messageID := c.Message().ReplyTo.ID
 	maxPlayerS := c.Text()
 
@@ -472,7 +472,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 	bggURL := strings.Trim(c.Text(), " ")
 
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	var event *models.Event
 	var game *models.BoardGame
 
@@ -784,12 +784,12 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, isTelegramUsername := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to join a game.", userName, userID)
 
 	var participantID string
 	var game *models.BoardGame
-	if participantID, _, game, err = t.Service.AddPlayer(nil, eventID, boardGameID, userID, userName); err != nil {
+	if participantID, _, game, err = t.Service.AddPlayer(nil, eventID, boardGameID, userID, userName, isTelegramUsername); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddPlayer"}}))
 	}
@@ -827,7 +827,7 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to exit a game.", userName, userID)
 
 	var participantID string
@@ -870,7 +870,7 @@ func (t Telegram) CallbackUnregisterWebhook(c telebot.Context) error {
 	}
 
 	userID := c.Sender().ID
-	userName := DefineUsername(c.Sender())
+	userName, _ := DefineUsername(c.Sender())
 	log.Printf("User %s (%d) clicked to unregister a webhook.", userName, userID)
 
 	if err = t.DB.RemoveWebhook(webhookID); err != nil {

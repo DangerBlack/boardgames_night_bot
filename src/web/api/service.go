@@ -430,10 +430,10 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 	return event, game, nil
 }
 
-func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string) (string, *models.Event, *models.BoardGame, error) {
+func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string, isTelegramUsername bool) (string, *models.Event, *models.BoardGame, error) {
 	var err error
 	var participantID string
-	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username); err != nil {
+	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username, isTelegramUsername); err != nil {
 		log.Println("failed to add user to participants table:", err)
 		return "", nil, nil, errors.New("invalid form data")
 	}

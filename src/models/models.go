@@ -29,9 +29,10 @@ type Event struct {
 }
 
 type AddPlayerRequest struct {
-	GameID   int64  `json:"game_id" binding:"required"`
-	UserID   int64  `json:"user_id" binding:"required"`
-	UserName string `json:"user_name" binding:"required"`
+	GameID             int64  `json:"game_id" binding:"required"`
+	UserID             int64  `json:"user_id" binding:"required"`
+	UserName           string `json:"user_name" binding:"required"`
+	IsTelegramUsername bool   `json:"is_telegram_username"`
 }
 
 type BoardGame struct {
@@ -99,10 +100,11 @@ type UpdateGameRequest struct {
 }
 
 type Participant struct {
-	ID       int64  `json:"id"`
-	UUID     string `json:"uuid"`
-	UserID   int64  `json:"user_id"`
-	UserName string `json:"user_name"`
+	ID                 int64  `json:"id"`
+	UUID               string `json:"uuid"`
+	UserID             int64  `json:"user_id"`
+	UserName           string `json:"user_name"`
+	IsTelegramUsername bool   `json:"is_telegram_username"`
 }
 
 // create enum with value add_player
@@ -163,6 +165,10 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 
 	msg += fmt.Sprintf("🎲 <b>%s [%s]</b> %s %s\n", link, name, players, complete)
 	for _, p := range bg.Participants {
+		if p.IsTelegramUsername {
+			msg += " - @" + p.UserName + "\n"
+			continue
+		}
 		msg += " - " + p.UserName + "\n"
 	}
 	msg += "\n"
@@ -193,6 +199,9 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 	btns := []telebot.InlineButton{}
 
 	msg := "📆 <b>" + e.Name + "</b>\n\n"
+	if e.UserName != "" {
+		msg += "👑 <b>" + e.UserName + "</b>\n"
+	}
 	if e.StartsAt != nil {
 		msg += "⏰ <b>" + e.StartsAt.Format("2006-01-02 15:04") + "</b>\n"
 	}

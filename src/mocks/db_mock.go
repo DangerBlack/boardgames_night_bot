@@ -14,7 +14,7 @@ type MockDatabase struct {
 	DeleteBoardGameByIDFunc        func(ID string) error
 	SelectEventByEventIDFunc       func(eventID string) (*models.Event, error)
 	DeleteEventFunc                func(id string) error
-	InsertParticipantFunc          func(id *string, eventID string, boardgameID, userID int64, userName string) (string, error)
+	InsertParticipantFunc          func(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error)
 	RemoveParticipantFunc          func(eventID string, userID int64) (string, int64, error)
 }
 
@@ -71,9 +71,9 @@ func (m *MockDatabase) UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggI
 	return nil
 }
 
-func (m *MockDatabase) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string) (string, error) {
+func (m *MockDatabase) InsertParticipant(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error) {
 	if m.InsertParticipantFunc != nil {
-		return m.InsertParticipantFunc(id, eventID, boardgameID, userID, userName)
+		return m.InsertParticipantFunc(id, eventID, boardgameID, userID, userName, isTelegramUsername)
 	}
 	return "mock-participant-uuid", nil
 }

@@ -158,6 +158,7 @@ func main() {
 	db.CreateTables()
 	db.MigrateToV1()
 	db.MigrateToV2()
+	db.MigrateToV3()
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:     botToken,

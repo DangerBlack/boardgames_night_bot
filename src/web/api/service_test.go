@@ -813,7 +813,7 @@ func TestAddPlayer(t *testing.T) {
 	participantID := "mock-participant-id"
 	isParticipantInserted := false
 
-	db.InsertParticipantFunc = func(id *string, eID string, gID, uID int64, uName string) (string, error) {
+	db.InsertParticipantFunc = func(id *string, eID string, gID, uID int64, uName string, isTelegramUsername bool) (string, error) {
 		if eID != eventID {
 			t.Fatalf("Expected eventID %s, got %s", eventID, eID)
 		}
@@ -855,7 +855,7 @@ func TestAddPlayer(t *testing.T) {
 		return &telebot.Message{ID: 1}, nil
 	}
 
-	pid, _, _, err := service.AddPlayer(nil, eventID, gameID, userID, username)
+	pid, _, _, err := service.AddPlayer(nil, eventID, gameID, userID, username, true)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
