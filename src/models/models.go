@@ -1,15 +1,12 @@
 package models
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/url"
 	"regexp"
 	"strconv"
 	"time"
-
-	"github.com/DangerBlack/gobgg"
 
 	"github.com/google/uuid"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -273,35 +270,6 @@ func ExtractBoardGameID(inputURL string) (int64, bool) {
 func IsValidUUID(u string) bool {
 	_, err := uuid.Parse(u)
 	return err == nil
-}
-
-func ExtractGameInfo(ctx context.Context, BGG *gobgg.BGG, id int64, gameName string) (*int, *string, *string, *string, error) {
-	var err error
-	var bgUrl, bgName, bgImageUrl *string
-	var maxPlayers *int
-	url := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", id)
-	bgUrl = &url
-
-	var things []gobgg.ThingResult
-
-	if things, err = BGG.GetThings(ctx, gobgg.GetThingIDs(id)); err != nil {
-		log.Printf("Failed to get game %d: %v", id, err)
-		return nil, nil, nil, nil, err
-	}
-
-	if len(things) > 0 {
-		maxPlayers = &things[0].MaxPlayers
-		if things[0].Name != "" {
-			bgName = &things[0].Name
-		} else {
-			bgName = &gameName
-		}
-		if things[0].Image != "" {
-			bgImageUrl = &things[0].Image
-		}
-	}
-
-	return maxPlayers, bgName, bgUrl, bgImageUrl, nil
 }
 
 func (e Event) FormatStartAt() *string {
