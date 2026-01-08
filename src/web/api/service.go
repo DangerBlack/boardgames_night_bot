@@ -462,6 +462,10 @@ func (s *Service) DeletePlayer(eventID string, userID int64) (string, *models.Ev
 	var game *models.BoardGame
 	if participantID, gameID, err = s.DB.RemoveParticipant(eventID, userID); err != nil {
 		log.Println("failed to remove participant from webhook:", err)
+		if errors.Is(err, database.ErrNoRows) {
+			return "", nil, nil, database.ErrNoRows
+		}
+
 		return "", nil, nil, errors.New("failed to remove participant")
 	}
 

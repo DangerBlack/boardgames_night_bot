@@ -674,6 +674,9 @@ func (d *Database) RemoveParticipant(eventID string, userID int64) (string, int6
 			"user_id":  userID,
 		})...,
 	).Scan(&id, &boardgameID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", 0, ErrNoRows
+		}
 		return "", 0, err
 	}
 
