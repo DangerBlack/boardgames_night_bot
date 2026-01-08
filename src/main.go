@@ -32,16 +32,16 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-func callEndpoint(url string) func() {
+func callHealthCheck(url string) func() {
 	return func() {
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Default().Println("error calling endpoint:", err)
+			log.Default().Println("error calling health check endpoint:", err)
 			return
 		}
 
 		defer resp.Body.Close()
-		log.Default().Println("endpoint called successfully at", time.Now())
+		log.Default().Println("health check endpoint called successfully at", time.Now())
 	}
 }
 
@@ -51,10 +51,10 @@ func InitHealthCheck(url string) {
 		return
 	}
 
-	defer callEndpoint(url)()
+	defer callHealthCheck(url)()
 
 	c := cron.New()
-	_, err := c.AddFunc("@hourly", callEndpoint(url))
+	_, err := c.AddFunc("@hourly", callHealthCheck(url))
 	if err != nil {
 		log.Default().Println("error scheduling cron job:", err)
 		return
