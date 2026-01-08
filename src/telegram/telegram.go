@@ -833,6 +833,10 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 	var participantID string
 	var game *models.BoardGame
 	if participantID, _, game, err = t.Service.DeletePlayer(eventID, userID); err != nil {
+		if errors.Is(err, database.ErrNoRows) {
+			return nil
+		}
+
 		log.Println("failed to delete player:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRemovePlayer"}}))
 	}
