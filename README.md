@@ -78,8 +78,6 @@ docker buildx build --platform linux/arm64 -t dangerblack/boardgames-night-bot:a
 ## Docker Compose
 
 ```
-version: "3.8"
-
 services:
   bgg_night:
     build: .
@@ -97,7 +95,11 @@ services:
     volumes:
       - ./archive:/archive
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
 ```
 
 ## Contributing
