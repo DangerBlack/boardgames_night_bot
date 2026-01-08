@@ -64,6 +64,9 @@ func (t Controller) Localizer(chatID *int64) *i18n.Localizer {
 
 func (c *Controller) InjectRoute() {
 	c.Router.GET("/", c.Index)
+	c.Router.GET("/health", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 	c.Router.POST("/events", c.CreateEvent)
 	c.Router.GET("/events/:event_id", c.GetEvent)
 	c.Router.GET("/events/:event_id/games/:game_id", c.GetGame)
