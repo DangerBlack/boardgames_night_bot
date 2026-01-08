@@ -44,7 +44,7 @@ func (s *bGGService) ExtractCachedGameInfo(ctx context.Context, id int64, gameNa
 	}
 
 	if err := s.cache.Set(cacheKey, info); err != nil {
-		log.Printf("Failed to cache BGG info for game %d: %v", id, err)
+		log.Default().Printf("Failed to cache BGG info for game %d: %v", id, err)
 	}
 
 	return info, nil
@@ -60,7 +60,7 @@ func (s *bGGService) ExtractGameInfo(ctx context.Context, id int64, gameName str
 	var things []gobgg.ThingResult
 
 	if things, err = s.BGG.GetThings(ctx, gobgg.GetThingIDs(id)); err != nil {
-		log.Printf("Failed to get game %d: %v", id, err)
+		log.Default().Printf("Failed to get game %d: %v", id, err)
 		return nil, err
 	}
 

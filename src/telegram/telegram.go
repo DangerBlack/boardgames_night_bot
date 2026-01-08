@@ -59,7 +59,7 @@ func (t Telegram) SetupHandlers() {
 
 		action := "$" + strings.Split(parts[0], "$")[1]
 
-		log.Printf("User clicked on button: *%s* %d", action, len(parts))
+		log.Default().Printf("User clicked on button: *%s* %d", action, len(parts))
 		switch action {
 		case string(models.AddPlayer):
 			return t.CallbackAddPlayer(c)
@@ -112,12 +112,12 @@ func (t Telegram) Start(c telebot.Context) error {
 	eventID := args[0]
 	var event *models.Event
 	if event, err = t.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return c.Send(t.Localizer(c).MustLocalizeMessage(&i18n.Message{ID: "EventNotFound"}), opts)
 	}
 
 	if event.MessageID == nil {
-		log.Println("event message id is nil")
+		log.Default().Println("event message id is nil")
 		return c.Send(t.Localizer(c).MustLocalizeMessage(&i18n.Message{ID: "EventNotFound"}), opts)
 	}
 
@@ -177,12 +177,12 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	var location *string
 
 	fullText := c.Message().Text
-	log.Println("Full text for parsing:", fullText)
+	log.Default().Println("Full text for parsing:", fullText)
 
 	// check regex for datetime at the end of the event name DD-MM-YYYY HH:MM
 	matched, err := regexp.MatchString(dateTimeRegex, fullText)
 	if err != nil {
-		log.Println("failed to parse date time:", err)
+		log.Default().Println("failed to parse date time:", err)
 	}
 	if matched {
 		re := regexp.MustCompile(dateTimeRegex)
@@ -190,9 +190,9 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		layout := "02-01-2006 15:04"
 		t, err := time.Parse(layout, dateTimeStr)
 		if err != nil {
-			log.Println("failed to parse date time:", err)
+			log.Default().Println("failed to parse date time:", err)
 		} else {
-			log.Printf("Parsed date time: %s\n", t.String())
+			log.Default().Printf("Parsed date time: %s\n", t.String())
 			startsAt = &t
 		}
 	}
@@ -200,19 +200,19 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	// check regex for location
 	matchedLoc, err := regexp.MatchString(locationRegex, fullText)
 	if err != nil {
-		log.Println("failed to parse location:", err)
+		log.Default().Println("failed to parse location:", err)
 	}
 	if matchedLoc {
 		re := regexp.MustCompile(locationRegex)
 		locationStr := re.FindStringSubmatch(fullText)
 		if len(locationStr) > 1 {
 			loc := strings.TrimSpace(locationStr[1])
-			log.Printf("Parsed location: %s\n", loc)
+			log.Default().Printf("Parsed location: %s\n", loc)
 			location = &loc
 		}
 	}
 
-	log.Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
+	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
 
 	allowGeneralJoin := false
 	if strings.Contains(fullText, "👥") {
@@ -221,12 +221,12 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 
 	var event *models.Event
 	if event, err = t.Service.CreateEvent(chatID, threadID, nil, userID, userName, eventName, location, startsAt, allowGeneralJoin); err != nil {
-		log.Println("failed to create event:", err)
+		log.Default().Println("failed to create event:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToCreateEvent"}})
 		return c.Reply(failedT)
 	}
 
-	log.Printf("Event created with id: %s", event.ID)
+	log.Default().Printf("Event created with id: %s", event.ID)
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeNewEvent,
@@ -274,7 +274,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 
 func (t Telegram) AddGame(c telebot.Context) error {
 	var err error
-	log.Println("user requested to add a game")
+	log.Default().Println("user requested to add a game")
 
 	args := c.Args()
 	if len(args) < 1 {
@@ -295,24 +295,24 @@ func (t Telegram) AddGame(c telebot.Context) error {
 	userID := c.Sender().ID
 	userName, _ := DefineUsername(c.Sender())
 	gameName := strings.Join(args[0:], " ")
-	log.Printf("Adding game: %s in chat id %d", gameName, chatID)
+	log.Default().Printf("Adding game: %s in chat id %d", gameName, chatID)
 
 	var event *models.Event
 
 	if event, err = t.DB.SelectEvent(chatID); err != nil {
-		log.Println("failed to add game:", err)
+		log.Default().Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
 
 	if event.Locked && event.UserID != userID {
-		log.Println("event is locked")
+		log.Default().Println("event is locked")
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "EventLocked"}}))
 	}
 
 	var game *models.BoardGame
 	if event, game, err = t.Service.CreateGame(event.ID, nil, userID, gameName, nil, nil); err != nil {
-		log.Println("failed to add game:", err)
+		log.Default().Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
@@ -339,13 +339,13 @@ func (t Telegram) AddGame(c telebot.Context) error {
 		telebot.NoPreview,
 	)
 	if err != nil {
-		log.Println("failed to dispatch add game message:", err)
+		log.Default().Println("failed to dispatch add game message:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
 
 	if err = t.DB.UpdateBoardGameMessageID(game.ID, int64(responseMsg.ID)); err != nil {
-		log.Println("failed to update boardgame id:", err)
+		log.Default().Println("failed to update boardgame id:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
 	}
@@ -405,12 +405,12 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
 	}
 
-	log.Printf("Updating game message id: %d with number of players: %d", messageID, maxPlayers)
+	log.Default().Printf("Updating game message id: %d with number of players: %d", messageID, maxPlayers)
 
 	var event *models.Event
 	var game *models.BoardGame
 	if event, err = t.DB.SelectEvent(chatID); err != nil {
-		log.Println("failed to add game:", err)
+		log.Default().Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateGame"}})
 		return c.Reply(failedT)
 	}
@@ -423,7 +423,7 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 	}
 
 	if game == nil {
-		log.Printf("game with message id %d not found in event %s", messageID, event.ID)
+		log.Default().Printf("game with message id %d not found in event %s", messageID, event.ID)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
 	}
 
@@ -437,7 +437,7 @@ func (t Telegram) UpdateGameNumberOfPlayer(c telebot.Context) error {
 		if errors.Is(err, errors.New("invalid bgg url")) {
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidBggURL"}}))
 		}
-		log.Println("failed to update game:", err)
+		log.Default().Println("failed to update game:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateGame"}}))
 	}
 
@@ -477,7 +477,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 	var game *models.BoardGame
 
 	if event, err = t.DB.SelectEvent(chatID); err != nil {
-		log.Println("failed to add game:", err)
+		log.Default().Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateGame"}})
 		return c.Reply(failedT)
 	}
@@ -490,7 +490,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 	}
 
 	if game == nil {
-		log.Printf("game with message id %d not found in event %s", messageID, event.ID)
+		log.Default().Printf("game with message id %d not found in event %s", messageID, event.ID)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "GameNotFound"}}))
 	}
 
@@ -503,7 +503,7 @@ func (t Telegram) UpdateGameBGGInfo(c telebot.Context) error {
 		if errors.Is(err, errors.New("invalid bgg url")) {
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidBggURL"}}))
 		}
-		log.Println("failed to update game:", err)
+		log.Default().Println("failed to update game:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUpdateGame"}}))
 	}
 
@@ -548,10 +548,10 @@ func (t Telegram) SetLanguage(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	language := args[0]
-	log.Printf("Setting language to %s in chat %d", language, chatID)
+	log.Default().Printf("Setting language to %s in chat %d", language, chatID)
 
 	if !t.LanguagePack.HasLanguage(language) {
-		log.Printf("Language %s not available\n", language)
+		log.Default().Printf("Language %s not available\n", language)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
 			DefaultMessage: &i18n.Message{
 				ID: "FailedLanguageNotAvailable",
@@ -564,7 +564,7 @@ func (t Telegram) SetLanguage(c telebot.Context) error {
 	}
 
 	if err := t.DB.InsertChat(chatID, &language, nil); err != nil {
-		log.Println("failed to set language:", err)
+		log.Default().Println("failed to set language:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLanguage"}}))
 	}
 
@@ -597,10 +597,10 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	location := strings.Join(args[0:], " ")
-	log.Printf("Setting location to %s in chat %d", location, chatID)
+	log.Default().Printf("Setting location to %s in chat %d", location, chatID)
 
 	if err := t.DB.InsertChat(chatID, nil, &location); err != nil {
-		log.Println("failed to set location:", err)
+		log.Default().Println("failed to set location:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLocation"}}))
 	}
 
@@ -635,7 +635,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	var secret string
 	chatID := c.Chat().ID
 	if secret, err = utils.GenerateSecret(32); err != nil {
-		log.Println("failed to register webhook:", err)
+		log.Default().Println("failed to register webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
 	webhookUrl := args[0]
@@ -649,7 +649,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	if chatID < 0 {
 		var admins []telebot.ChatMember
 		if admins, err = t.Bot.AdminsOf(c.Chat()); err != nil {
-			log.Println("failed to get chat admins:", err)
+			log.Default().Println("failed to get chat admins:", err)
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 		}
 
@@ -662,18 +662,18 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 		}
 
 		if !isAdmin {
-			log.Printf("user %d is not admin in chat %d", c.Sender().ID, chatID)
+			log.Default().Printf("user %d is not admin in chat %d", c.Sender().ID, chatID)
 			return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "OnlyAdminsCanRegisterWebhook"}}))
 		}
 	}
 
 	if !utils.IsValidURL(webhookUrl) {
-		log.Println("invalid webhook URL:", webhookUrl)
+		log.Default().Println("invalid webhook URL:", webhookUrl)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidWebhookURL"}}))
 	}
 
 	if utils.IsLocalURL(webhookUrl) && os.Getenv("ALLOW_LOCAL_WEBHOOKS") != "true" {
-		log.Println("local webhook URL not allowed:", webhookUrl)
+		log.Default().Println("local webhook URL not allowed:", webhookUrl)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidWebhookURL"}}))
 	}
 
@@ -685,16 +685,16 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 
 	var tmpMsg *telebot.Message
 	if tmpMsg, err = t.Bot.Send(c.Sender(), testMessage); err != nil {
-		log.Println("failed to send test message to webhook:", err)
+		log.Default().Println("failed to send test message to webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
 
 	// delete test message
 	if err = t.Bot.Delete(tmpMsg); err != nil {
-		log.Println("failed to delete test message:", err)
+		log.Default().Println("failed to delete test message:", err)
 	}
 
-	log.Printf("Registering webhook %s with secret %s in chat %d", webhookUrl, secret, chatID)
+	log.Default().Printf("Registering webhook %s with secret %s in chat %d", webhookUrl, secret, chatID)
 
 	threadIDx := c.Message().ThreadID
 
@@ -706,7 +706,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	var webhookID *int64
 	var webhookUUID *string
 	if webhookID, webhookUUID, err = t.DB.InsertWebhook(chatID, threadID, webhookUrl, secret); err != nil {
-		log.Println("failed to register webhook:", err)
+		log.Default().Println("failed to register webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
 
@@ -742,7 +742,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 	})
 
 	if _, err = t.Bot.Send(c.Sender(), privateMessage, markup); err != nil {
-		log.Println("failed to send private message with webhook secret:", err)
+		log.Default().Println("failed to send private message with webhook secret:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRegisterWebhook"}}))
 	}
 
@@ -751,7 +751,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 
 func (t Telegram) TestWebhook(c telebot.Context) error {
 	chatID := c.Chat().ID
-	log.Printf("Testing webhooks in chat %d", chatID)
+	log.Default().Printf("Testing webhooks in chat %d", chatID)
 
 	sentAt := time.Now()
 	t.Hook.SendAllWebhookAsync(context.Background(), chatID, models.HookWebhookEnvelope{
@@ -771,26 +771,26 @@ func (t Telegram) CallbackAddPlayer(c telebot.Context) error {
 	data := c.Callback().Data
 	parts := strings.Split(data, "|")
 	if len(parts) != 3 {
-		log.Println("Invalid data:", data)
+		log.Default().Println("Invalid data:", data)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
 	}
 
 	eventID := parts[1]
 	boardGameID, err2 := strconv.ParseInt(parts[2], 10, 64)
 	if !models.IsValidUUID(eventID) || err2 != nil {
-		log.Println("Invalid parsed id:", data)
+		log.Default().Println("Invalid parsed id:", data)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
 	}
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
 	userName, isTelegramUsername := DefineUsername(c.Sender())
-	log.Printf("User %s (%d) clicked to join a game.", userName, userID)
+	log.Default().Printf("User %s (%d) clicked to join a game.", userName, userID)
 
 	var participantID string
 	var game *models.BoardGame
 	if participantID, _, game, err = t.Service.AddPlayer(nil, eventID, boardGameID, userID, userName, isTelegramUsername); err != nil {
-		log.Println("failed to add user to participants table:", err)
+		log.Default().Println("failed to add user to participants table:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddPlayer"}}))
 	}
 
@@ -815,20 +815,20 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 	data := c.Callback().Data
 	parts := strings.Split(data, "|")
 	if len(parts) != 2 {
-		log.Println("Invalid data:", data)
+		log.Default().Println("Invalid data:", data)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
 	}
 
 	eventID := parts[1]
 	if !models.IsValidUUID(eventID) {
-		log.Println("Invalid parsed id:", data)
+		log.Default().Println("Invalid parsed id:", data)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
 	}
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
 	userName, _ := DefineUsername(c.Sender())
-	log.Printf("User %s (%d) clicked to exit a game.", userName, userID)
+	log.Default().Printf("User %s (%d) clicked to exit a game.", userName, userID)
 
 	var participantID string
 	var game *models.BoardGame
@@ -837,7 +837,7 @@ func (t Telegram) CallbackRemovePlayer(c telebot.Context) error {
 			return nil
 		}
 
-		log.Println("failed to delete player:", err)
+		log.Default().Println("failed to delete player:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToRemovePlayer"}}))
 	}
 
@@ -862,23 +862,23 @@ func (t Telegram) CallbackUnregisterWebhook(c telebot.Context) error {
 	data := c.Callback().Data
 	parts := strings.Split(data, "|")
 	if len(parts) != 2 {
-		log.Println("Invalid data:", data)
+		log.Default().Println("Invalid data:", data)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "InvalidData"}}))
 	}
 
 	// parse to int64
 	webhookID, err2 := strconv.ParseInt(parts[1], 10, 64)
 	if err2 != nil {
-		log.Println("Invalid webhook id:", parts[1])
+		log.Default().Println("Invalid webhook id:", parts[1])
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUnregisterWebhook"}}))
 	}
 
 	userID := c.Sender().ID
 	userName, _ := DefineUsername(c.Sender())
-	log.Printf("User %s (%d) clicked to unregister a webhook.", userName, userID)
+	log.Default().Printf("User %s (%d) clicked to unregister a webhook.", userName, userID)
 
 	if err = t.DB.RemoveWebhook(webhookID); err != nil {
-		log.Println("failed to remove webhook:", err)
+		log.Default().Println("failed to remove webhook:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToUnregisterWebhook"}}))
 	}
 
@@ -888,7 +888,7 @@ func (t Telegram) CallbackUnregisterWebhook(c telebot.Context) error {
 		ID:   messageID,
 		Chat: c.Chat(),
 	}); err != nil {
-		log.Println("failed to delete webhook message:", err)
+		log.Default().Println("failed to delete webhook message:", err)
 	}
 
 	return nil

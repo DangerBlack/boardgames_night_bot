@@ -62,7 +62,7 @@ func (wc *WebhookClient) SendWebhookAsync(ctx context.Context, chatID int64, w m
 func (wc *WebhookClient) SendWebhookWithRetry(ctx context.Context, chatID int64, w models.Webhook, payload models.HookWebhookEnvelope, secret string) error {
 	var lastErr error
 	for attempt := 1; attempt <= wc.MaxAttempt; attempt++ {
-		log.Printf("In chat %d, attempt %d to send webhook to %s", chatID, attempt, w.Url)
+		log.Default().Printf("In chat %d, attempt %d to send webhook to %s", chatID, attempt, w.Url)
 		if err := wc.sendWebhook(ctx, w, payload, secret); err != nil {
 			lastErr = err
 			time.Sleep(time.Second * time.Duration(1<<uint(attempt-1))) // Exponential backoff
@@ -79,7 +79,7 @@ func (wc *WebhookClient) registerFailure(webhookID string) {
 		count = val.(int)
 	}
 	if err := wc.FailureCache.Set(webhookID, count+1); err != nil {
-		log.Printf("Failed to set failure count for %s: %v", webhookID, err)
+		log.Default().Printf("Failed to set failure count for %s: %v", webhookID, err)
 	}
 }
 
@@ -88,7 +88,7 @@ func (wc *WebhookClient) shouldDiscard(webhookID string) bool {
 	if err != nil {
 		return false
 	}
-	log.Printf("Webhook %s has %d failures", webhookID, val.(int))
+	log.Default().Printf("Webhook %s has %d failures", webhookID, val.(int))
 	count := val.(int)
 	return count >= wc.MaxFailuresAttempt
 }
@@ -96,7 +96,7 @@ func (wc *WebhookClient) shouldDiscard(webhookID string) bool {
 // sendWebhook performs the actual HTTP POST request, signing the payload with the new signature scheme.
 func (wc *WebhookClient) sendWebhook(ctx context.Context, w models.Webhook, payload models.HookWebhookEnvelope, secret string) error {
 	if wc.shouldDiscard(w.UUID) {
-		log.Printf("Discarding webhook %s due to repeated failures", w.UUID)
+		log.Default().Printf("Discarding webhook %s due to repeated failures", w.UUID)
 		return errors.New("webhook discarded due to repeated failures")
 	}
 	body, err := json.Marshal(payload)

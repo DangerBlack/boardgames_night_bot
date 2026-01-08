@@ -36,18 +36,18 @@ func callEndpoint(url string) func() {
 	return func() {
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Println("error calling endpoint:", err)
+			log.Default().Println("error calling endpoint:", err)
 			return
 		}
 
 		defer resp.Body.Close()
-		log.Println("endpoint called successfully at", time.Now())
+		log.Default().Println("endpoint called successfully at", time.Now())
 	}
 }
 
 func InitHealthCheck(url string) {
 	if url == "" {
-		log.Println("the HEALTH_CHECK_URL is not set in .env file")
+		log.Default().Println("the HEALTH_CHECK_URL is not set in .env file")
 		return
 	}
 
@@ -56,12 +56,12 @@ func InitHealthCheck(url string) {
 	c := cron.New()
 	_, err := c.AddFunc("@hourly", callEndpoint(url))
 	if err != nil {
-		log.Println("error scheduling cron job:", err)
+		log.Default().Println("error scheduling cron job:", err)
 		return
 	}
 
 	c.Start()
-	log.Println("cron job started...")
+	log.Default().Println("cron job started...")
 }
 
 func StringOrDefault(s, defaultValue string) string {
@@ -153,7 +153,7 @@ func main() {
 
 	defer db.Close()
 
-	log.Println("database connection established.")
+	log.Default().Println("database connection established.")
 
 	db.CreateTables()
 	db.MigrateToV1()
@@ -202,28 +202,28 @@ func main() {
 		Service: service,
 	}
 
-	log.Println("bot started")
+	log.Default().Println("bot started")
 
 	telegram.SetupHandlers()
 
 	go func() {
-		log.Println("server started")
+		log.Default().Println("server started")
 		web.StartServer(port, db, bggService, bot, bundle, wh, service)
-		log.Println("server stopped")
+		log.Default().Println("server stopped")
 	}()
 	go func() {
-		log.Println("bot started")
+		log.Default().Println("bot started")
 		bot.Start()
-		log.Println("bot stopped")
+		log.Default().Println("bot stopped")
 	}()
 
 	<-signalChan
-	log.Println("shutdown signal received.")
+	log.Default().Println("shutdown signal received.")
 
 	// Gracefully stop the server and bot
 	gracefulShutdown(bot)
 
-	log.Println("shutdown complete.")
+	log.Default().Println("shutdown complete.")
 }
 
 func gracefulShutdown(bot *telebot.Bot) {
@@ -233,7 +233,7 @@ func gracefulShutdown(bot *telebot.Bot) {
 	// Stop the bot
 	go func() {
 		bot.Stop() // Assuming bot has a Stop() method
-		log.Println("bot shutdown completed.")
+		log.Default().Println("bot shutdown completed.")
 	}()
 
 	// Wait for the shutdown timeout or for cleanup to finish

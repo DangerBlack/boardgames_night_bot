@@ -23,7 +23,7 @@ func (m *MockBGGService) ExtractGameInfo(ctx context.Context, id int64, gameName
 	if m.ExtractGameInfoFunc != nil {
 		return m.ExtractGameInfoFunc(ctx, id, gameName)
 	}
-	log.Println("MockBGGService.ExtractGameInfo callback not configured")
+	log.Default().Println("MockBGGService.ExtractGameInfo callback not configured")
 	return nil, nil
 }
 
@@ -36,7 +36,7 @@ func (m *MockBGGService) ExtractCachedGameInfo(ctx context.Context, id int64, ga
 		return m.ExtractGameInfoFunc(ctx, id, gameName)
 	}
 
-	log.Println("MockBGGService.ExtractCachedGameInfo callback not configured")
+	log.Default().Println("MockBGGService.ExtractCachedGameInfo callback not configured")
 	return nil, nil
 }
 
@@ -44,7 +44,7 @@ func (m *MockBGGService) GetThings(ctx context.Context, setters ...gobgg.GetOpti
 	if m.GetThingsFunc != nil {
 		return m.GetThingsFunc(ctx, setters)
 	}
-	log.Println("MockBGGService.GetThings callback not configured")
+	log.Default().Println("MockBGGService.GetThings callback not configured")
 	return []gobgg.ThingResult{}, nil
 }
 
@@ -52,6 +52,6 @@ func (m *MockBGGService) Search(ctx context.Context, query string, setter ...gob
 	if m.SearchFunc != nil {
 		return m.SearchFunc(ctx, query, setter)
 	}
-	log.Println("MockBGGService.Search callback not configured")
+	log.Default().Println("MockBGGService.Search callback not configured")
 	return []gobgg.SearchResult{}, nil
 }

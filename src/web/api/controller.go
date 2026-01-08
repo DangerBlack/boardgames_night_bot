@@ -91,7 +91,7 @@ func (c *Controller) BggSearch(ctx *gin.Context) {
 	bgCtx := context.Background()
 	results, err := c.BGG.Search(bgCtx, name)
 	if err != nil {
-		log.Printf("BGG search error: %v", err)
+		log.Default().Printf("BGG search error: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search BGG"})
 		return
 	}
@@ -198,7 +198,7 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 
 	var newEvent models.CreateEventRequest
 	if err = ctx.ShouldBind(&newEvent); err != nil {
-		log.Println("failed to bind form:", err)
+		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form data")
 		return
 	}
@@ -217,7 +217,7 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 
 	var event *models.Event
 	if event, err = c.Service.CreateEvent(newEvent.ChatID, newEvent.ThreadID, nil, newEvent.UserID, newEvent.UserName, newEvent.Name, newEvent.Location, newEvent.StartsAt, bool(newEvent.AllowGeneralJoin)); err != nil {
-		log.Println("failed to create event:", err)
+		log.Default().Println("failed to create event:", err)
 		c.renderError(ctx, nil, nil, "Failed to create event")
 		return
 	}
@@ -237,7 +237,7 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 	var event *models.Event
 
 	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		c.renderError(ctx, nil, nil, "Invalid event ID")
 		return
 	}
@@ -296,7 +296,7 @@ func (c *Controller) GetGame(ctx *gin.Context) {
 	var game *models.BoardGame
 
 	if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		c.renderError(ctx, nil, nil, "Invalid event ID")
 		return
 	}
@@ -305,7 +305,7 @@ func (c *Controller) GetGame(ctx *gin.Context) {
 
 	game = utils.PickGame(event, gameID)
 	if game == nil {
-		log.Printf("invalid game ID: %d", gameID)
+		log.Default().Printf("invalid game ID: %d", gameID)
 		c.renderError(ctx, nil, nil, "Invalid game ID")
 		return
 	}
@@ -349,7 +349,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 
 	var bg models.UpdateGameRequest
 	if err = ctx.ShouldBind(&bg); err != nil {
-		log.Println("failed to bind form:", err)
+		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form")
 		return
 	}
@@ -358,7 +358,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 	var game *models.BoardGame
 
 	if event, game, err = c.Service.UpdateGame(eventID, gameID, bg.UserID, bg); err != nil {
-		log.Println("failed to update game:", err)
+		log.Default().Println("failed to update game:", err)
 		var chatID *int64
 		if event != nil {
 			chatID = &event.ChatID
@@ -415,7 +415,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 func (c *Controller) DeleteGame(ctx *gin.Context) {
 	var err error
 	eventID := ctx.Param("event_id")
-	log.Println("Deleting game for event:", eventID)
+	log.Default().Println("Deleting game for event:", eventID)
 	gameID, err2 := strconv.ParseInt(ctx.Param("game_id"), 10, 64)
 	if err2 != nil {
 		c.renderError(ctx, nil, nil, "Invalid game ID")
@@ -439,13 +439,13 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 
 	var gameUUID string
 	if gameUUID, err = c.DB.SelectGameUUIDByGameID(gameID); err != nil {
-		log.Println("failed to load game UUID:", err)
+		log.Default().Println("failed to load game UUID:", err)
 		c.renderError(ctx, nil, nil, "Invalid game ID")
 		return
 	}
 
 	if event, game, err = c.Service.DeleteGame(eventID, gameUUID, userID, username); err != nil {
-		log.Println("failed to delete game:", err)
+		log.Default().Println("failed to delete game:", err)
 		var chatID *int64
 		if event != nil {
 			chatID = &event.ChatID
@@ -480,7 +480,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 
 	var bg models.AddGameRequest
 	if err = ctx.ShouldBind(&bg); err != nil {
-		log.Println("failed to bind form:", err)
+		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form data")
 		return
 	}
@@ -489,7 +489,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 	var game *models.BoardGame
 
 	if event, game, err = c.Service.CreateGame(eventID, nil, bg.UserID, bg.Name, bg.MaxPlayers, bg.BggUrl); err != nil {
-		log.Println("failed to add game:", err)
+		log.Default().Println("failed to add game:", err)
 		var chatID *int64
 		if event != nil {
 			chatID = &event.ChatID
@@ -551,7 +551,7 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 
 	var addPlayer models.AddPlayerRequest
 	if err = ctx.ShouldBindJSON(&addPlayer); err != nil {
-		log.Println("failed to bind form:", err)
+		log.Default().Println("failed to bind form:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
 	}
@@ -560,7 +560,7 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 	var event *models.Event
 	var game *models.BoardGame
 	if participantID, event, game, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName, addPlayer.IsTelegramUsername); err != nil {
-		log.Println("failed to add player:", err)
+		log.Default().Println("failed to add player:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
 	}
@@ -659,7 +659,7 @@ func (c *Controller) CheckEventID() gin.HandlerFunc {
 		var err error
 		var webhookEnvelope map[string]any
 		if err = ctx.ShouldBindBodyWith(&webhookEnvelope, binding.JSON); err != nil {
-			log.Println("failed to bind webhook json:", err)
+			log.Default().Println("failed to bind webhook json:", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
 			return
 		}
@@ -672,14 +672,14 @@ func (c *Controller) CheckEventID() gin.HandlerFunc {
 
 				var event *models.Event
 				if event, err = c.DB.SelectEventByEventID(eventID); err != nil {
-					log.Println("failed to load event:", err)
+					log.Default().Println("failed to load event:", err)
 					ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 					return
 				}
 
 				chatID := ctx.GetInt64("chat_id")
 				if event.ChatID != chatID {
-					log.Printf("Webhook event chat ID %d does not match expected chat ID %d", event.ChatID, chatID)
+					log.Default().Printf("Webhook event chat ID %d does not match expected chat ID %d", event.ChatID, chatID)
 					ctx.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 					return
 				}
@@ -698,12 +698,12 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 
 	var webhookEnvelope models.HookWebhookEnvelope
 	if err = ctx.ShouldBindBodyWith(&webhookEnvelope, binding.JSON); err != nil {
-		log.Println("failed to bind webhook json:", err)
+		log.Default().Println("failed to bind webhook json:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
 		return
 	}
 
-	log.Printf("Received webhook for chat %d: %v", chatID, webhookEnvelope)
+	log.Default().Printf("Received webhook for chat %d: %v", chatID, webhookEnvelope)
 
 	switch webhookEnvelope.Type {
 	case models.HookWebhookTypeNewEvent:
@@ -714,19 +714,19 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		}
 
 		if payload.ChatID == 0 {
-			log.Printf("Setting missing ChatID in webhook payload to %d", chatID)
+			log.Default().Printf("Setting missing ChatID in webhook payload to %d", chatID)
 			payload.ChatID = chatID
 		}
 
 		if payload.ChatID != chatID {
-			log.Printf("Webhook chat ID %d does not match expected chat ID %d", payload.ChatID, chatID)
+			log.Default().Printf("Webhook chat ID %d does not match expected chat ID %d", payload.ChatID, chatID)
 			ctx.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 			return
 		}
 
-		log.Printf("Processing new event webhook: %+v", payload)
+		log.Default().Printf("Processing new event webhook: %+v", payload)
 		if _, err = c.Service.CreateEvent(payload.ChatID, &threadID, &payload.ID, payload.UserID, payload.UserName, payload.Name, payload.Location, payload.StartsAt, false); err != nil {
-			log.Println("failed to add event from webhook:", err)
+			log.Default().Println("failed to add event from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add event"})
 			return
 		}
@@ -737,10 +737,10 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing delete event webhook: %+v", payload)
+		log.Default().Printf("Processing delete event webhook: %+v", payload)
 
 		if err = c.Service.DeleteEvent(payload.EventID, payload.UserID, payload.UserName); err != nil {
-			log.Println("failed to delete event from webhook:", err)
+			log.Default().Println("failed to delete event from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete event"})
 			return
 		}
@@ -751,9 +751,9 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing new game webhook: %+v", payload)
+		log.Default().Printf("Processing new game webhook: %+v", payload)
 		if _, _, err = c.Service.CreateGame(payload.EventID, &payload.ID, payload.UserID, payload.Name, &payload.MaxPlayers, payload.BGG.URL); err != nil {
-			log.Println("failed to add game from webhook:", err)
+			log.Default().Println("failed to add game from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add game"})
 			return
 		}
@@ -764,10 +764,10 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing delete game webhook: %+v", payload)
+		log.Default().Printf("Processing delete game webhook: %+v", payload)
 
 		if _, _, err = c.Service.DeleteGame(payload.EventID, payload.ID, payload.UserID, payload.UserName); err != nil {
-			log.Println("failed to delete game from webhook:", err)
+			log.Default().Println("failed to delete game from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete game"})
 			return
 		}
@@ -778,11 +778,11 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing update game webhook: %+v", payload)
+		log.Default().Printf("Processing update game webhook: %+v", payload)
 
 		gameID, err := c.DB.SelectGameIDByGameUUID(payload.ID)
 		if err != nil {
-			log.Println("failed to get game ID from UUID in webhook:", err)
+			log.Default().Println("failed to get game ID from UUID in webhook:", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to update game"})
 			return
 		}
@@ -798,7 +798,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			UserName:   payload.UserName,
 			Unlink:     unlink,
 		}); err != nil {
-			log.Println("failed to update game from webhook:", err)
+			log.Default().Println("failed to update game from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update game"})
 			return
 		}
@@ -809,17 +809,17 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing add participant webhook: %+v", payload)
+		log.Default().Printf("Processing add participant webhook: %+v", payload)
 
 		gameID, err := c.DB.SelectGameIDByGameUUID(payload.GameID)
 		if err != nil {
-			log.Println("failed to get game ID from UUID in webhook:", err)
+			log.Default().Println("failed to get game ID from UUID in webhook:", err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to add participant"})
 			return
 		}
 
 		if _, _, _, err = c.Service.AddPlayer(&payload.ID, payload.EventID, gameID, payload.UserID, payload.UserName, false); err != nil {
-			log.Println("failed to add participant from webhook:", err)
+			log.Default().Println("failed to add participant from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add participant"})
 			return
 		}
@@ -830,10 +830,10 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing remove participant webhook: %+v", payload)
+		log.Default().Printf("Processing remove participant webhook: %+v", payload)
 
 		if _, _, _, err = c.Service.DeletePlayer(payload.EventID, payload.UserID); err != nil {
-			log.Println("failed to remove participant from webhook:", err)
+			log.Default().Println("failed to remove participant from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove participant"})
 			return
 		}
@@ -844,7 +844,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
-		log.Printf("Processing send message webhook: %+v", payload)
+		log.Default().Printf("Processing send message webhook: %+v", payload)
 
 		name := ""
 		if payload.UserName != nil {
@@ -856,21 +856,21 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			ThreadID:  int(threadID),
 		})
 		if err != nil {
-			log.Println("failed to send message from webhook:", err)
+			log.Default().Println("failed to send message from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 			return
 		}
 	case models.HookWebhookTypeTestWebhook:
-		log.Printf("Received test webhook for chat %d", chatID)
+		log.Default().Printf("Received test webhook for chat %d", chatID)
 		var payload *models.HookTestPayload
 		if payload, err = Cast[models.HookTestPayload](webhookEnvelope.Data); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
 			return
 		}
 
-		log.Printf("Test webhook payload: %s", payload.Message)
+		log.Default().Printf("Test webhook payload: %s", payload.Message)
 	default:
-		log.Printf("Unhandled webhook type: %s", webhookEnvelope.Type)
+		log.Default().Printf("Unhandled webhook type: %s", webhookEnvelope.Type)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unhandled webhook type"})
 		return
 	}
@@ -881,12 +881,12 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 func Cast[T any](data any) (*T, error) {
 	payloadBytes, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("failed to marshal payload for type %T: %v", (*T)(nil), err)
+		log.Default().Printf("failed to marshal payload for type %T: %v", (*T)(nil), err)
 		return nil, err
 	}
 	var payload T
 	if err = json.Unmarshal(payloadBytes, &payload); err != nil {
-		log.Printf("failed to unmarshal payload for type %T: %v", (*T)(nil), err)
+		log.Default().Printf("failed to unmarshal payload for type %T: %v", (*T)(nil), err)
 		return nil, err
 	}
 	return &payload, nil

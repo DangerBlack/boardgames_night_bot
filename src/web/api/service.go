@@ -42,29 +42,29 @@ func NewService(db database.DatabaseService, bgg bgg.BGGService, bot telegram_in
 func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID int64, userName, name string, location *string, startsAt *time.Time, allowGeneralJoin bool) (*models.Event, error) {
 	var err error
 	fullText := name
-	log.Println("Full text for parsing:", fullText)
+	log.Default().Println("Full text for parsing:", fullText)
 
 	var eventID string
-	log.Printf("Creating event: %s by user: %s (%d) in chat: %d", name, userName, userID, chatID)
+	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", name, userName, userID, chatID)
 
 	if eventID, err = s.DB.InsertEvent(id, chatID, userID, userName, name, nil, location, startsAt); err != nil {
-		log.Println("failed to create event:", err)
+		log.Default().Println("failed to create event:", err)
 		return nil, errors.New("failed to create event")
 	}
-	log.Printf("Event created with id: %s", eventID)
+	log.Default().Printf("Event created with id: %s", eventID)
 
 	if allowGeneralJoin {
-		log.Printf("User %s (%d) is allowed to join event %s without selecting a game", userName, userID, eventID)
+		log.Default().Printf("User %s (%d) is allowed to join event %s without selecting a game", userName, userID, eventID)
 
 		if _, _, err = s.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
-			log.Println("failed to add game:", err)
+			log.Default().Println("failed to add game:", err)
 			return nil, errors.New("failed to add game")
 		}
 	}
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return nil, errors.New("invalid event ID")
 	}
 
@@ -85,12 +85,12 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 
 	responseMsg, err := s.Bot.Send(to, body, opts, markup, telebot.NoPreview)
 	if err != nil {
-		log.Println("failed to create event:", err)
+		log.Default().Println("failed to create event:", err)
 		return nil, errors.New("failed to create event")
 	}
 
 	if err = s.DB.UpdateEventMessageID(eventID, int64(responseMsg.ID)); err != nil {
-		log.Println("failed to create event:", err)
+		log.Default().Println("failed to create event:", err)
 		return nil, errors.New("failed to create event")
 	}
 
@@ -104,17 +104,17 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load event:", err)
+		log.Default().Println("failed to load event:", err)
 		return errors.New("invalid event ID")
 	}
 
 	if event.Locked && (userID == nil || event.UserID != *userID) {
-		log.Println("event is locked")
+		log.Default().Println("event is locked")
 		return errors.New("unable to delete locked event")
 	}
 
 	if err = s.DB.DeleteEvent(eventID); err != nil {
-		log.Println("failed to delete event:", err)
+		log.Default().Println("failed to delete event:", err)
 		return errors.New("failed to delete event")
 	}
 
@@ -133,7 +133,7 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 	})
 
 	if event.MessageID == nil {
-		log.Println("event message id is nil, skipping telegram notification")
+		log.Default().Println("event message id is nil, skipping telegram notification")
 		return errors.New("event message ID is nil")
 	}
 
@@ -144,9 +144,9 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 		},
 	}
 
-	log.Printf("Sending delete message to chat %d: %s", to.ID, message)
+	log.Default().Printf("Sending delete message to chat %d: %s", to.ID, message)
 	if _, err = s.Bot.Send(to, message, options); err != nil {
-		log.Println("failed to send message:", err)
+		log.Default().Println("failed to send message:", err)
 	}
 
 	if err = s.Bot.Delete(&telebot.Message{
@@ -155,7 +155,7 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 			ID: event.ChatID,
 		},
 	}); err != nil {
-		log.Println("failed to delete message:", err)
+		log.Default().Println("failed to delete message:", err)
 	}
 
 	return nil
@@ -174,12 +174,12 @@ func (s *Service) CreateGame(
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return nil, nil, errors.New("invalid event ID")
 	}
 
 	if event.Locked && event.UserID != userID {
-		log.Println("event is locked")
+		log.Default().Println("event is locked")
 		return nil, nil, errors.New("unable to add game to locked event")
 	}
 
@@ -198,7 +198,7 @@ func (s *Service) CreateGame(
 
 		var bgInfo *models.BggInfo
 		if bgInfo, err = s.BGG.ExtractCachedGameInfo(bgCtx, id, name); err != nil {
-			log.Printf("Failed to get game %d: %v", id, err)
+			log.Default().Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
 			bgName = bgInfo.Name
@@ -210,15 +210,15 @@ func (s *Service) CreateGame(
 			}
 		}
 	} else {
-		log.Printf("Searching for game %s", name)
+		log.Default().Printf("Searching for game %s", name)
 		var results []gobgg.SearchResult
 
 		if results, err = s.BGG.Search(bgCtx, name); err != nil {
-			log.Printf("Failed to search game %s: %v", name, err)
+			log.Default().Printf("Failed to search game %s: %v", name, err)
 		}
 
 		if len(results) == 0 {
-			log.Printf("Game %s not found", name)
+			log.Default().Printf("Game %s not found", name)
 		} else {
 			sort.Slice(results, func(i, j int) bool {
 				return results[i].ID < results[j].ID
@@ -232,16 +232,16 @@ func (s *Service) CreateGame(
 
 			bgID = &results[0].ID
 
-			log.Printf("Game %s id %d found: %s", name, *bgID, *bgUrl)
+			log.Default().Printf("Game %s id %d found: %s", name, *bgID, *bgUrl)
 
 			var things []gobgg.ThingResult
 
 			if things, err = s.BGG.GetThings(bgCtx, gobgg.GetThingIDs(*bgID)); err != nil {
-				log.Printf("Failed to get game %s: %v", name, err)
+				log.Default().Printf("Failed to get game %s: %v", name, err)
 			}
 
 			if len(things) > 0 {
-				log.Printf("Game details of %s found", name)
+				log.Default().Printf("Game details of %s found", name)
 				if things[0].MaxPlayers > 0 && finalMaxPlayers == nil {
 					finalMaxPlayers = &things[0].MaxPlayers
 				}
@@ -263,15 +263,15 @@ func (s *Service) CreateGame(
 		finalMaxPlayers = &defaultMax
 	}
 
-	log.Printf("Inserting %s in the db", name)
+	log.Default().Printf("Inserting %s in the db", name)
 
 	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, *finalMaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
-		log.Println("failed to insert board game:", err)
+		log.Default().Println("failed to insert board game:", err)
 		return nil, nil, errors.New("failed to insert board game")
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
-		log.Println("failed to update telegram", err)
+		log.Default().Println("failed to update telegram", err)
 	}
 
 	var game *models.BoardGame
@@ -293,18 +293,18 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 	var game *models.BoardGame
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return nil, nil, errors.New("invalid event ID")
 	}
 
 	if event.Locked && event.UserID != userID {
-		log.Println("event is locked")
+		log.Default().Println("event is locked")
 		return nil, nil, errors.New("unable to add game to locked event")
 	}
 
 	game = utils.PickGame(event, gameID)
 	if game == nil {
-		log.Printf("invalid game ID: %d", gameID)
+		log.Default().Printf("invalid game ID: %d", gameID)
 		return nil, nil, errors.New("invalid game ID")
 	}
 
@@ -336,7 +336,7 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 		var bgInfo *models.BggInfo
 
 		if bgInfo, err = s.BGG.ExtractCachedGameInfo(bgCtx, id, game.Name); err != nil {
-			log.Printf("Failed to get game %d: %v", id, err)
+			log.Default().Printf("Failed to get game %d: %v", id, err)
 		} else {
 			bgID = &id
 			bgName = bgInfo.Name
@@ -350,18 +350,18 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 	}
 
 	if err = s.DB.UpdateBoardGameBGGInfoByID(gameID, maxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
-		log.Println("failed to update board game:", err)
+		log.Default().Println("failed to update board game:", err)
 		return nil, nil, errors.New("failed to update board game")
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
-		log.Println("failed to update telegram", err)
+		log.Default().Println("failed to update telegram", err)
 		return nil, nil, err
 	}
 
 	game = utils.PickGame(event, gameID)
 	if game == nil {
-		log.Printf("invalid game ID: %d", gameID)
+		log.Default().Printf("invalid game ID: %d", gameID)
 		return nil, nil, errors.New("invalid game ID")
 	}
 
@@ -374,24 +374,24 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 	var game *models.BoardGame
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return nil, nil, errors.New("invalid event ID")
 	}
 
 	if event.Locked && event.UserID != userID {
-		log.Println("event is locked")
+		log.Default().Println("event is locked")
 		return nil, nil, errors.New("unable to delete game from locked event")
 	}
 
 	game = utils.PickGameUUID(event, gameUUID)
 
 	if game == nil {
-		log.Printf("invalid game ID: %s", gameUUID)
+		log.Default().Printf("invalid game ID: %s", gameUUID)
 		return nil, nil, errors.New("invalid game ID")
 	}
 
 	if err = s.DB.DeleteBoardGameByID(gameUUID); err != nil {
-		log.Println("failed to delete board game:", err)
+		log.Default().Println("failed to delete board game:", err)
 		return nil, nil, errors.New("failed to delete board game")
 	}
 
@@ -417,14 +417,14 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 		},
 	}
 
-	log.Printf("Sending delete message to chat %d: %s", to.ID, message)
+	log.Default().Printf("Sending delete message to chat %d: %s", to.ID, message)
 	if _, err = s.Bot.Send(to, message, options); err != nil {
-		log.Println("failed to send message:", err)
+		log.Default().Println("failed to send message:", err)
 	}
 
-	log.Printf("Game %s deleted from event %s", game.Name, event.Name)
+	log.Default().Printf("Game %s deleted from event %s", game.Name, event.Name)
 	if _, err = s.updateTelegram(eventID); err != nil {
-		log.Println("failed to update telegram", err)
+		log.Default().Println("failed to update telegram", err)
 	}
 
 	return event, game, nil
@@ -434,18 +434,18 @@ func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int
 	var err error
 	var participantID string
 	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username, isTelegramUsername); err != nil {
-		log.Println("failed to add user to participants table:", err)
+		log.Default().Println("failed to add user to participants table:", err)
 		return "", nil, nil, errors.New("invalid form data")
 	}
 
 	if _, err = s.updateTelegram(eventID); err != nil {
-		log.Println("failed to update telegram", err)
+		log.Default().Println("failed to update telegram", err)
 		return "", nil, nil, err
 	}
 
 	var event *models.Event
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return "", nil, nil, errors.New("invalid event ID")
 	}
 
@@ -461,7 +461,7 @@ func (s *Service) DeletePlayer(eventID string, userID int64) (string, *models.Ev
 	var event *models.Event
 	var game *models.BoardGame
 	if participantID, gameID, err = s.DB.RemoveParticipant(eventID, userID); err != nil {
-		log.Println("failed to remove participant from webhook:", err)
+		log.Default().Println("failed to remove participant from webhook:", err)
 		if errors.Is(err, database.ErrNoRows) {
 			return "", nil, nil, database.ErrNoRows
 		}
@@ -470,7 +470,7 @@ func (s *Service) DeletePlayer(eventID string, userID int64) (string, *models.Ev
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
-		log.Println("failed to update telegram", err)
+		log.Default().Println("failed to update telegram", err)
 		return "", nil, nil, err
 	}
 
@@ -484,12 +484,12 @@ func (s *Service) updateTelegram(eventID string) (*models.Event, error) {
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-		log.Println("failed to load game:", err)
+		log.Default().Println("failed to load game:", err)
 		return nil, err
 	}
 
 	if event.MessageID == nil {
-		log.Println("event message id is nil")
+		log.Default().Println("event message id is nil")
 		return nil, err
 	}
 
@@ -502,9 +502,9 @@ func (s *Service) updateTelegram(eventID string) (*models.Event, error) {
 		},
 	}, body, markup, telebot.NoPreview)
 	if err != nil {
-		log.Println("failed to edit message", err)
+		log.Default().Println("failed to edit message", err)
 		if strings.Contains(err.Error(), models.MessageUnchangedErrorMessage) {
-			log.Println("failed because unchanged", err)
+			log.Default().Println("failed because unchanged", err)
 		}
 	}
 
