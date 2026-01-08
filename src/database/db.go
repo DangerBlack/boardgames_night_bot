@@ -125,7 +125,7 @@ func (d *Database) CreateTables() {
 		}
 	}
 
-	log.Println("database tables ensured")
+	log.Default().Println("database tables ensured")
 }
 
 func (d *Database) MigrateToV1() {
@@ -209,7 +209,7 @@ func (d *Database) MigrateToV2() {
 		}
 	}
 
-	log.Println("database migration to v2 completed")
+	log.Default().Println("database migration to v2 completed")
 }
 
 func (d *Database) MigrateToV3() {
@@ -219,12 +219,12 @@ func (d *Database) MigrateToV3() {
 		log.Fatal(err)
 	}
 
-	log.Println("database migration to v3 completed")
+	log.Default().Println("database migration to v3 completed")
 }
 
 func (d *Database) Close() {
 	d.db.Close()
-	log.Println("database connection closed")
+	log.Default().Println("database connection closed")
 }
 
 func (d *Database) InsertEvent(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
@@ -835,7 +835,7 @@ func (d *Database) addColumnIfNotExists(table, column, columnType string) (bool,
 
 	err := d.db.QueryRow(query, table, column).Scan(&exists)
 	if err == sql.ErrNoRows {
-		log.Println("migrating database: adding column", column, "to table", table)
+		log.Default().Println("migrating database: adding column", column, "to table", table)
 		alter := "ALTER TABLE " + table + " ADD COLUMN " + column + " " + columnType
 		_, err = d.db.Exec(alter)
 		return true, err

@@ -214,7 +214,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 	for _, bg := range e.BoardGames {
 		bgMsg, btn, err := e.FormatBG(localizer, url, bg)
 		if err != nil {
-			log.Printf("Failed to format board game: %v", err)
+			log.Default().Printf("Failed to format board game: %v", err)
 			continue
 		}
 
@@ -255,7 +255,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 		markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
 	}
 
-	log.Default().Printf("Formatted message for event %s: %s", e.ID, msg)
+	log.Default().Printf("Formatted message in chat_id %d for event %s", e.ChatID, e.ID)
 
 	return msg, markup
 }

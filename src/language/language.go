@@ -2,6 +2,7 @@ package language
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -25,7 +26,7 @@ func BuildLanguagePack(dir string) (*LanguagePack, error) {
 
 func (l *LanguagePack) LoadLanguages(dir string) error {
 	l.Languages = []string{}
-	println("Loading available languages from:", path.Join(dir, "localization"))
+	log.Default().Printf("Loading available languages from: %s", path.Join(dir, "localization"))
 	entries, err := os.ReadDir(path.Join(dir, "localization"))
 	if err != nil {
 		return ErrorLanguageNotAvailable
