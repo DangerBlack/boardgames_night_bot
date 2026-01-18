@@ -196,7 +196,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	return msg, btn, nil
 }
 
-func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebot.ReplyMarkup) {
+func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *telebot.ReplyMarkup) {
 	btns := []telebot.InlineButton{}
 
 	msg := "📆 <b>" + e.Name + "</b>\n\n"
@@ -204,8 +204,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 		msg += "👑 <b>" + e.UserName + "</b>\n"
 	}
 	if e.StartsAt != nil {
-		// https://calendar.google.com/calendar/render?action=TEMPLATE&text=Event+Title&dates=20260201T150000Z/20260201T160000Z&details=Description&location=Online
-		gTitle := strings.ReplaceAll(e.Name, " ", "+")
+		gTitle := url.QueryEscape(strings.ReplaceAll(e.Name, " ", "+"))
 		gStart := e.StartsAt.Format("20060102T150400")
 		gEndTime := e.StartsAt.Add(2 * time.Hour)
 		gEnd := gEndTime.Format("20060102T150400")
@@ -213,7 +212,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 		gDetails := strings.ReplaceAll(localizer.MustLocalizeMessage(&i18n.Message{ID: "CalendarEventDetails"}), " ", "+")
 		gLocation := ""
 		if e.Location != nil {
-			gLocation = *e.Location
+			gLocation = url.QueryEscape(*e.Location)
 		}
 
 		googleCalendarLink := fmt.Sprintf("https://www.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&ctz=%s&details=%s&location=%s&sf=true&output=xml", gTitle, gStart, gEnd, gtz, gDetails, gLocation)
@@ -226,7 +225,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 		msg += "\n"
 	}
 	for _, bg := range e.BoardGames {
-		bgMsg, btn, err := e.FormatBG(localizer, url, bg)
+		bgMsg, btn, err := e.FormatBG(localizer, webUrl, bg)
 		if err != nil {
 			log.Default().Printf("Failed to format board game: %v", err)
 			continue
@@ -259,7 +258,7 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 	// Add "AddGame" button for this chat
 	btn2 := telebot.InlineButton{
 		Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "AddGame"}),
-		URL:  fmt.Sprintf("%s?startapp=%s", url.BotMiniAppURL, e.ID),
+		URL:  fmt.Sprintf("%s?startapp=%s", webUrl.BotMiniAppURL, e.ID),
 	}
 	btns = append(btns, btn2)
 

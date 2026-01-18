@@ -358,8 +358,26 @@ END:VCALENDAR`,
 		location,
 	)
 
+	secureFileName := "calendar_event"
+	if event.Name != "" {
+		acceptedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+		secureFileName = ""
+		eventName := strings.ReplaceAll(event.Name, " ", "_")
+		for _, ch := range eventName {
+			if strings.ContainsRune(acceptedChars, ch) {
+				secureFileName += string(ch)
+			}
+		}
+		if secureFileName == "" {
+			secureFileName = "calendar_event"
+		}
+		if len(secureFileName) > 30 {
+			secureFileName = secureFileName[:30]
+		}
+	}
+
 	ctx.Header("Content-Type", "text/calendar; charset=utf-8")
-	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", strings.ReplaceAll(event.Name, " ", "_")))
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", secureFileName))
 	ctx.String(http.StatusOK, ics)
 }
 
