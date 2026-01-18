@@ -18,7 +18,7 @@ RUN chmod +x boardgame_night_bot
 FROM alpine:latest
 
 # Install sqlite runtime libraries
-RUN apk add --no-cache sqlite-libs
+RUN apk add --no-cache sqlite-libs curl
 
 COPY --from=builder /app/boardgame_night_bot .
 COPY --from=builder /app/templates ./templates
