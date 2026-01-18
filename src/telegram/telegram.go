@@ -186,14 +186,14 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		log.Default().Println("failed to parse date time:", err)
 	}
 	if matched {
-		location := t.DB.GetDefaultTimezoneLocation(chatID)
-		log.Default().Printf("Using location %s for chat %d", location.String(), chatID)
+		tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
+		log.Default().Printf("Using location %s for chat %d", tzLocation.String(), chatID)
 
 		re := regexp.MustCompile(dateTimeRegex)
 		dateTimeStr := re.FindString(fullText)
 		layout := "02-01-2006 15:04"
 
-		t, err := time.ParseInLocation(layout, dateTimeStr, location)
+		t, err := time.ParseInLocation(layout, dateTimeStr, tzLocation)
 		if err != nil {
 			log.Default().Println("failed to parse date time:", err)
 		} else {

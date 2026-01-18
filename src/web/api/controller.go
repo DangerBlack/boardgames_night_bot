@@ -312,9 +312,9 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		location = *event.Location
 	}
 
-	loc := c.DB.GetDefaultTimezoneLocation(event.ChatID)
+	tzLocation := c.DB.GetDefaultTimezoneLocation(event.ChatID)
 
-	startTime := event.StartsAt.In(loc)
+	startTime := event.StartsAt.In(tzLocation)
 	endTime := startTime.Add(2 * time.Hour)
 
 	formatICS := func(t time.Time) string {
@@ -349,9 +349,9 @@ END:VCALENDAR`,
 		ctx.Request.Host,
 		uid,
 		time.Now().UTC().Format("20060102T150405Z"),
-		loc.String(),
+		tzLocation.String(),
 		formatICS(startTime),
-		loc.String(),
+		tzLocation.String(),
 		formatICS(endTime),
 		event.Name,
 		description,

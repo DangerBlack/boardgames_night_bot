@@ -739,7 +739,7 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 }
 
 func (d *Database) GetDefaultTimezoneLocation(chatID int64) *time.Location {
-	query := `SELECT default_location FROM chats WHERE chat_id = @chat_id;`
+	query := `SELECT default_timezone FROM chats WHERE chat_id = @chat_id;`
 
 	var locationStr pgtype.Text
 	if err := d.db.QueryRow(query,
