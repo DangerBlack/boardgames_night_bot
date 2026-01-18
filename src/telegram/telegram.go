@@ -42,6 +42,7 @@ func (t Telegram) SetupHandlers() {
 	t.Bot.Handle("/add_game", t.AddGame)
 	t.Bot.Handle("/language", t.SetLanguage)
 	t.Bot.Handle("/location", t.SetDefaultLocation)
+	t.Bot.Handle("/timezone", t.SetDefaultTimezone)
 	t.Bot.Handle("/register", t.RegisterWebhook)
 	t.Bot.Handle("/test", t.TestWebhook)
 
@@ -185,10 +186,14 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		log.Default().Println("failed to parse date time:", err)
 	}
 	if matched {
+		location := t.DB.GetDefaultLocation(chatID)
+		log.Default().Printf("Using location %s for chat %d", location.String(), chatID)
+
 		re := regexp.MustCompile(dateTimeRegex)
 		dateTimeStr := re.FindString(fullText)
 		layout := "02-01-2006 15:04"
-		t, err := time.Parse(layout, dateTimeStr)
+
+		t, err := time.ParseInLocation(layout, dateTimeStr, location)
 		if err != nil {
 			log.Default().Println("failed to parse date time:", err)
 		} else {
@@ -563,7 +568,7 @@ func (t Telegram) SetLanguage(c telebot.Context) error {
 		))
 	}
 
-	if err := t.DB.InsertChat(chatID, &language, nil); err != nil {
+	if err := t.DB.InsertChat(chatID, &language, nil, nil); err != nil {
 		log.Default().Println("failed to set language:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLanguage"}}))
 	}
@@ -599,7 +604,7 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 	location := strings.Join(args[0:], " ")
 	log.Default().Printf("Setting location to %s in chat %d", location, chatID)
 
-	if err := t.DB.InsertChat(chatID, nil, &location); err != nil {
+	if err := t.DB.InsertChat(chatID, nil, &location, nil); err != nil {
 		log.Default().Println("failed to set location:", err)
 		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetLocation"}}))
 	}
@@ -610,6 +615,46 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 		},
 		TemplateData: map[string]string{
 			"Location": location,
+		},
+	})
+
+	return c.Reply(messageT)
+}
+func (t Telegram) SetDefaultTimezone(c telebot.Context) error {
+	args := c.Args()
+	if len(args) < 1 {
+		usageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+			DefaultMessage: &i18n.Message{
+				ID: "Usage",
+			},
+			TemplateData: map[string]string{
+				"Command": "/timezone",
+				"Example": "Europe/Rome",
+			},
+		})
+		return c.Reply(usageT)
+	}
+
+	chatID := c.Chat().ID
+	timezone := strings.Join(args[0:], " ")
+	log.Default().Printf("Setting timezone to %s in chat %d", timezone, chatID)
+
+	_, err := time.LoadLocation(timezone)
+	if err != nil {
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetTimezone"}}))
+	}
+
+	if err := t.DB.InsertChat(chatID, nil, nil, &timezone); err != nil {
+		log.Default().Println("failed to set timezone:", err)
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToSetTimezone"}}))
+	}
+
+	messageT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "TimezoneSet",
+		},
+		TemplateData: map[string]string{
+			"Timezone": timezone,
 		},
 	})
 

@@ -206,16 +206,17 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, url WebUrl) (string, *telebo
 	if e.StartsAt != nil {
 		// https://calendar.google.com/calendar/render?action=TEMPLATE&text=Event+Title&dates=20260201T150000Z/20260201T160000Z&details=Description&location=Online
 		gTitle := strings.ReplaceAll(e.Name, " ", "+")
-		gStart := e.StartsAt.Format("20060102T150400Z")
+		gStart := e.StartsAt.Format("20060102T150400")
 		gEndTime := e.StartsAt.Add(2 * time.Hour)
-		gEnd := gEndTime.Format("20060102T150400Z")
+		gEnd := gEndTime.Format("20060102T150400")
+		gtz := e.StartsAt.Location().String()
 		gDetails := strings.ReplaceAll(localizer.MustLocalizeMessage(&i18n.Message{ID: "CalendarEventDetails"}), " ", "+")
 		gLocation := ""
 		if e.Location != nil {
 			gLocation = *e.Location
 		}
 
-		googleCalendarLink := fmt.Sprintf("https://www.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&details=%s&location=%s&sf=true&output=xml", gTitle, gStart, gEnd, gDetails, gLocation)
+		googleCalendarLink := fmt.Sprintf("https://www.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&ctz=%s&details=%s&location=%s&sf=true&output=xml", gTitle, gStart, gEnd, gtz, gDetails, gLocation)
 		msg += fmt.Sprintf("⏰ <b><a href=\"%s\">%s</a></b>\n", googleCalendarLink, e.StartsAt.Format("2006-01-02 15:04"))
 	}
 	if e.Location != nil && *e.Location != "" {

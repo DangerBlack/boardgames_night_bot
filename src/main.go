@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	_ "time/tzdata"
 
 	"time"
 
@@ -159,6 +160,7 @@ func main() {
 	db.MigrateToV1()
 	db.MigrateToV2()
 	db.MigrateToV3()
+	db.MigrateToV4()
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:     botToken,
