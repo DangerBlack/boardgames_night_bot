@@ -231,9 +231,13 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 func (c *Controller) GetEvent(ctx *gin.Context) {
 	var err error
 	eventID := ctx.Param("event_id")
-
 	if !models.IsValidUUID(eventID) {
 		c.renderError(ctx, nil, nil, "Invalid event ID")
+		return
+	}
+
+	if ctx.Query("format") == "ics" {
+		c.GetEventCalendar(ctx)
 		return
 	}
 
@@ -278,7 +282,85 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 		"AddNewGame":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAddNewGame"}),
 		"GameName":       localizer.MustLocalizeMessage(&i18n.Message{ID: "WebGameName"}),
 		"MaxPlayers":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
+		"AddToCalendar":  localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAddToCalendar"}),
 	})
+}
+
+func (c *Controller) GetEventCalendar(ctx *gin.Context) {
+	var err error
+	eventID := ctx.Param("event_id")
+
+	if !models.IsValidUUID(eventID) {
+		c.renderError(ctx, nil, nil, "Invalid event ID")
+		return
+	}
+
+	event, err := c.DB.SelectEventByEventID(eventID)
+	if err != nil {
+		log.Default().Println("failed to load event:", err)
+		c.renderError(ctx, nil, nil, "Invalid event ID")
+		return
+	}
+
+	if event.StartsAt == nil {
+		c.renderError(ctx, nil, nil, "Event start time missing")
+		return
+	}
+
+	location := ""
+	if event.Location != nil {
+		location = *event.Location
+	}
+
+	loc := c.DB.GetDefaultTimezoneLocation(event.ChatID)
+
+	startTime := event.StartsAt.In(loc)
+	endTime := startTime.Add(2 * time.Hour)
+
+	formatICS := func(t time.Time) string {
+		if t.Location() == time.UTC {
+			return t.Format("20060102T150405Z")
+		}
+		return t.Format("20060102T150405")
+	}
+
+	localizer := c.Localizer(&event.ChatID)
+	description := localizer.MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{
+			ID: "CalendarEventDetails",
+		},
+	})
+
+	uid := fmt.Sprintf("%s@%s", eventID, ctx.Request.Host)
+
+	ics := fmt.Sprintf(`BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//%s//Event Calendar//EN
+BEGIN:VEVENT
+UID:%s
+DTSTAMP:%s
+DTSTART;TZID=%s:%s
+DTEND;TZID=%s:%s
+SUMMARY:%s
+DESCRIPTION:%s
+LOCATION:%s
+END:VEVENT
+END:VCALENDAR`,
+		ctx.Request.Host,
+		uid,
+		time.Now().UTC().Format("20060102T150405Z"),
+		loc.String(),
+		formatICS(startTime),
+		loc.String(),
+		formatICS(endTime),
+		event.Name,
+		description,
+		location,
+	)
+
+	ctx.Header("Content-Type", "text/calendar; charset=utf-8")
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", strings.ReplaceAll(event.Name, " ", "_")))
+	ctx.String(http.StatusOK, ics)
 }
 
 func (c *Controller) GetGame(ctx *gin.Context) {

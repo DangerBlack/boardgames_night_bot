@@ -37,7 +37,7 @@ type DatabaseService interface {
 	SelectGameUUIDByGameID(gameID int64) (string, error)
 	InsertChat(chatID int64, language *string, location *string, timezone *string) error
 	GetPreferredLanguage(chatID int64) string
-	GetDefaultLocation(chatID int64) *time.Location
+	GetDefaultTimezoneLocation(chatID int64) *time.Location
 	InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error)
 	RemoveWebhook(webhookID int64) error
 	GetWebhooksByChatID(chatID int64) ([]models.Webhook, error)
@@ -738,7 +738,7 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	return language
 }
 
-func (d *Database) GetDefaultLocation(chatID int64) *time.Location {
+func (d *Database) GetDefaultTimezoneLocation(chatID int64) *time.Location {
 	query := `SELECT default_location FROM chats WHERE chat_id = @chat_id;`
 
 	var locationStr pgtype.Text

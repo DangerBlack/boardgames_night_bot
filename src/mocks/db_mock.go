@@ -112,7 +112,7 @@ func (m *MockDatabase) GetPreferredLanguage(chatID int64) string {
 	return "en"
 }
 
-func (m *MockDatabase) GetDefaultLocation(chatID int64) *time.Location {
+func (m *MockDatabase) GetDefaultTimezoneLocation(chatID int64) *time.Location {
 	loc, _ := time.LoadLocation("UTC")
 	return loc
 }
