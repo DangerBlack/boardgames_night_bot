@@ -77,6 +77,7 @@ OnlyAdminsCanRegisterWebhook = "Only chat administrators can register a webhook.
 WebhookTestDispatched = "Test message sent to the webhook."
 
 Open = "Click here to open event {{.Name }} settings and join."
+CalendarEventDetails = "You have a reserved spot for this board game event!"
 
 WebNoParticipants = "No participants yet."
 WebPlayers = "players"
