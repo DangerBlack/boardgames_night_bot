@@ -365,7 +365,7 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		return
 	}
 
-	log.Default().Printf("Generated ICS for event %s:\n%s", event.ID, cal)
+	log.Default().Println("Generated ICS for event:", event.ID)
 
 	ctx.Header("Content-Type", "text/calendar; charset=utf-8")
 	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", secureFileName))
