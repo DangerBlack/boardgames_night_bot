@@ -44,6 +44,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.4.0
+	github.com/anujdecoder/ics v0.0.0-20210722105539-a165de50d8b5
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
 	github.com/nicksnyder/go-i18n/v2 v2.5.1

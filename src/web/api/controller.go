@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/anujdecoder/ics"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -312,17 +313,8 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		location = *event.Location
 	}
 
-	tzLocation := c.DB.GetDefaultTimezoneLocation(event.ChatID)
-
-	startTime := event.StartsAt.In(tzLocation)
+	startTime := event.StartsAt
 	endTime := startTime.Add(2 * time.Hour)
-
-	formatICS := func(t time.Time) string {
-		if t.Location() == time.UTC {
-			return t.Format("20060102T150405Z")
-		}
-		return t.Format("20060102T150405")
-	}
 
 	localizer := c.Localizer(&event.ChatID)
 	description := localizer.MustLocalize(&i18n.LocalizeConfig{
@@ -331,33 +323,23 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		},
 	})
 
-	uid := fmt.Sprintf("%s@%s", eventID, ctx.Request.Host)
-
-	ics := fmt.Sprintf(`BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//%s//Event Calendar//EN
-BEGIN:VEVENT
-UID:%s
-DTSTAMP:%s
-DTSTART;TZID=%s:%s
-DTEND;TZID=%s:%s
-SUMMARY:%s
-DESCRIPTION:%s
-LOCATION:%s
-END:VEVENT
-END:VCALENDAR`,
-		ctx.Request.Host,
-		uid,
-		time.Now().UTC().Format("20060102T150405Z"),
-		tzLocation.String(),
-		formatICS(startTime),
-		tzLocation.String(),
-		formatICS(endTime),
-		event.Name,
-		description,
-		location,
-	)
-
+	eventICS := &ics.Event{
+		Class:        ics.Classification_PUBLIC,
+		Summary:      event.Name,
+		Description:  description,
+		Location:     location,
+		Status:       ics.EventStatus_CONFIRMED,
+		DtStart:      startTime.UTC(),
+		DtEnd:        endTime.UTC(),
+		RRule:        []string{},
+		ExRule:       []string{},
+		ExDate:       []time.Time{},
+		Transparency: ics.OPAQUE,
+		Attendees:    []ics.Attendee{},
+		Organizer: ics.Attendee{
+			CommonName: event.UserName,
+		},
+	}
 	secureFileName := "calendar_event"
 	if event.Name != "" {
 		acceptedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
@@ -376,9 +358,18 @@ END:VCALENDAR`,
 		}
 	}
 
+	cal, err := eventICS.Generate(event.ID)
+	if err != nil {
+		log.Default().Println("failed to generate ICS:", err)
+		c.renderError(ctx, nil, nil, "Failed to generate calendar file")
+		return
+	}
+
+	log.Default().Printf("Generated ICS for event %s:\n%s", event.ID, cal)
+
 	ctx.Header("Content-Type", "text/calendar; charset=utf-8")
 	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", secureFileName))
-	ctx.String(http.StatusOK, ics)
+	ctx.String(http.StatusOK, cal)
 }
 
 func (c *Controller) GetGame(ctx *gin.Context) {
