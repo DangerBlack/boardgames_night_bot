@@ -313,8 +313,7 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		location = *event.Location
 	}
 
-	startTime := event.StartsAt
-	endTime := startTime.Add(2 * time.Hour)
+	endTime := event.StartsAt.Add(2 * time.Hour)
 
 	localizer := c.Localizer(&event.ChatID)
 	description := localizer.MustLocalize(&i18n.LocalizeConfig{
@@ -329,7 +328,7 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 		Description:  description,
 		Location:     location,
 		Status:       ics.EventStatus_CONFIRMED,
-		DtStart:      startTime,
+		DtStart:      *event.StartsAt,
 		DtEnd:        endTime,
 		RRule:        []string{},
 		ExRule:       []string{},
