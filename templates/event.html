@@ -213,7 +213,7 @@
     <p><b>👑 {{ .Host }}</b></p>
     {{ end }}
     {{ if .StartsAt }}
-    <p><b>⏰ {{ .StartsAt }}</b></p>
+    <p><b>⏰ {{ .StartsAt }}</b><br /> <span><i><a href="#" onclick="Telegram.WebApp.openLink('{{.Id}}?format=ics')">({{ .AddToCalendar }})</a></i></span></p>
     {{ end }}
     {{ if .Location }}
     <p><b>📍 {{ .Location }}</b></p>
