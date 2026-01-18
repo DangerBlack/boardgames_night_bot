@@ -204,12 +204,12 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 		msg += "👑 <b>" + e.UserName + "</b>\n"
 	}
 	if e.StartsAt != nil {
-		gTitle := url.QueryEscape(strings.ReplaceAll(e.Name, " ", "+"))
+		gTitle := url.QueryEscape(e.Name)
 		gStart := e.StartsAt.Format("20060102T150400")
 		gEndTime := e.StartsAt.Add(2 * time.Hour)
 		gEnd := gEndTime.Format("20060102T150400")
 		gtz := e.StartsAt.Location().String()
-		gDetails := strings.ReplaceAll(localizer.MustLocalizeMessage(&i18n.Message{ID: "CalendarEventDetails"}), " ", "+")
+		gDetails := url.QueryEscape(localizer.MustLocalizeMessage(&i18n.Message{ID: "CalendarEventDetails"}))
 		gLocation := ""
 		if e.Location != nil {
 			gLocation = url.QueryEscape(*e.Location)
