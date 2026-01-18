@@ -12,6 +12,7 @@ Verwendung:
 - Nutze /add_game [Spielname], um Spiele zum Event hinzuzufügen.
 - Nutze /language [lan], um die Sprache des Bots einzustellen (en/it/de).
 - Nutze /location [Ort], um den Standardort des Chats festzulegen oder zu aktualisieren.
+- Nutze /timezone [Zeitzone], um die Standardzeitzone des Chats festzulegen oder zu aktualisieren (z.B. Europe/Rome).
 - Nutze /register [URL], um einen Webhook zu registrieren.
 - Nutze /test um eine Testnachricht an den registrierten Webhook zu senden.
 
@@ -31,6 +32,7 @@ FailedToUpdateGame = "Spiel konnte nicht aktualisiert werden. Bitte versuche es 
 FailedToGetGameInfo = "Spielinformationen von BoardGameGeek konnten nicht abgerufen werden. Bitte versuche es erneut."
 FailedToSetLanguage = "Sprache konnte nicht festgelegt werden. Bitte versuche es erneut."
 FailedToSetLocation = "Standort konnte nicht festgelegt werden. Bitte versuche es erneut."
+FailedToSetTimezone = "Zeitzone konnte nicht festgelegt werden. Bitte versuche es erneut."
 FailedToAddPlayer = "Spieler konnte nicht hinzugefügt werden. Bitte versuche es erneut."
 FailedToRemovePlayer = "Spieler konnte nicht entfernt werden. Bitte versuche es erneut."
 FailedLanguageNotAvailable = "Sprache nicht verfügbar. Bitte versuche es erneut mit einer der folgenden verfügbaren Sprachen: {{.AvailableLanguages}}."
@@ -46,6 +48,7 @@ GameAdded = "Spiel <b>{{.Name}}</b>{{.Link}} hinzugefügt! (1/{{.MaxPlayers}} Sp
 GameUpdated = "Spiel aktualisiert!"
 LanguageSet = "Sprache auf {{.Language}} gesetzt."
 LocationSet = "Standardstandort auf {{.Location}} gesetzt."
+TimezoneSet = "Standardzeitzone auf {{.Timezone}} gesetzt."
 
 GameNotFound = "Spiel nicht gefunden. Du versuchst, die Informationen eines Spiels zu aktualisieren, das nicht existiert. Wahrscheinlich kommentierst du die falsche Nachricht."
 EventNotFound = "Ereignis nicht gefunden."

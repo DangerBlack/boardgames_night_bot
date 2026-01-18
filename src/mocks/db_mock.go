@@ -104,12 +104,17 @@ func (m *MockDatabase) DeleteBoardGameByID(ID string) error {
 	return nil
 }
 
-func (m *MockDatabase) InsertChat(chatID int64, language *string, location *string) error {
+func (m *MockDatabase) InsertChat(chatID int64, language *string, location *string, timezone *string) error {
 	return nil
 }
 
 func (m *MockDatabase) GetPreferredLanguage(chatID int64) string {
 	return "en"
+}
+
+func (m *MockDatabase) GetDefaultLocation(chatID int64) *time.Location {
+	loc, _ := time.LoadLocation("UTC")
+	return loc
 }
 
 func (m *MockDatabase) InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error) {

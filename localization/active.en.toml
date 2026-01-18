@@ -12,6 +12,7 @@ How to use:
 - Use /add_game [game name] to add games to the event.
 - Use /language [lan] to set the bot language (en/it/de).
 - Use /location [location] to set or update the default location for the chat.
+- Use /timezone [timezone] to set or update the default timezone for the chat (e.g., Europe/Rome).
 - Use /register [URL] to register a webhook.
 - Use /test to send a test message to the registered webhook.
 
@@ -31,6 +32,7 @@ FailedToUpdateGame = "Failed to update game. Please try again."
 FailedToGetGameInfo = "Failed to get game info from BoardGameGeek. Please try again."
 FailedToSetLanguage = "Failed to set language. Please try again."
 FailedToSetLocation = "Failed to set location. Please try again."
+FailedToSetTimezone = "Failed to set timezone. Please try again."
 FailedToAddPlayer = "Failed to add player. Please try again."
 FailedToRemovePlayer = "Failed to remove player. Please try again."
 FailedLanguageNotAvailable = "Language not available. Please try again with one of these available languages: {{.AvailableLanguages}}."
@@ -45,6 +47,7 @@ GameAdded = "Game <b>{{.Name}}</b>{{.Link}} added! (1/{{.MaxPlayers}} players).\
 GameUpdated = "Game updated!"
 LanguageSet = "Language set to {{.Language}}."
 LocationSet = "Default location set to {{.Location}}."
+TimezoneSet = "Default timezone set to {{.Timezone}}."
 
 GameNotFound = "Game not found. You are trying to update the information of a game that does not exist. You are probably commenting on the wrong message."
 EventNotFound = "Event not found."

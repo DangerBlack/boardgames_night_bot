@@ -35,8 +35,9 @@ type DatabaseService interface {
 	HasBoardGameWithMessageID(messageID int64) bool
 	SelectGameIDByGameUUID(gameUUID string) (int64, error)
 	SelectGameUUIDByGameID(gameID int64) (string, error)
-	InsertChat(chatID int64, language *string, location *string) error
+	InsertChat(chatID int64, language *string, location *string, timezone *string) error
 	GetPreferredLanguage(chatID int64) string
+	GetDefaultLocation(chatID int64) *time.Location
 	InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error)
 	RemoveWebhook(webhookID int64) error
 	GetWebhooksByChatID(chatID int64) ([]models.Webhook, error)
@@ -220,6 +221,16 @@ func (d *Database) MigrateToV3() {
 	}
 
 	log.Default().Println("database migration to v3 completed")
+}
+
+func (d *Database) MigrateToV4() {
+	var err error
+	_, err = d.addColumnIfNotExists("chats", "default_timezone", "TEXT")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Default().Println("database migration to v4 completed")
 }
 
 func (d *Database) Close() {
@@ -683,18 +694,19 @@ func (d *Database) RemoveParticipant(eventID string, userID int64) (string, int6
 	return id, boardgameID, nil
 }
 
-func (d *Database) InsertChat(chatID int64, language *string, location *string) error {
+func (d *Database) InsertChat(chatID int64, language *string, location *string, timezone *string) error {
 	query := `
-		INSERT INTO chats (chat_id, language, default_location) 
+		INSERT INTO chats (chat_id, language, default_location, default_timezone) 
 		VALUES (
 			@chat_id,
 			COALESCE(@language, (SELECT language FROM chats WHERE chat_id = @chat_id), 'en'),
-			@default_location
+			@default_location,
+			@default_timezone
 		)
 		ON CONFLICT(chat_id) DO UPDATE SET
 			language = COALESCE(EXCLUDED.language, language, 'en'),
-			default_location = COALESCE(EXCLUDED.default_location, default_location);
-
+			default_location = COALESCE(EXCLUDED.default_location, default_location),
+			default_timezone = COALESCE(EXCLUDED.default_timezone, default_timezone);
 	`
 
 	if _, err := d.db.Exec(query,
@@ -702,6 +714,7 @@ func (d *Database) InsertChat(chatID int64, language *string, location *string) 
 			"chat_id":          chatID,
 			"language":         language,
 			"default_location": location,
+			"default_timezone": timezone,
 		})...,
 	); err != nil {
 		return err
@@ -723,6 +736,31 @@ func (d *Database) GetPreferredLanguage(chatID int64) string {
 	}
 
 	return language
+}
+
+func (d *Database) GetDefaultLocation(chatID int64) *time.Location {
+	query := `SELECT default_location FROM chats WHERE chat_id = @chat_id;`
+
+	var locationStr pgtype.Text
+	if err := d.db.QueryRow(query,
+		NamedArgs(map[string]any{
+			"chat_id": chatID,
+		})...,
+	).Scan(&locationStr); err != nil {
+		return time.UTC
+	}
+
+	locationName := StringOrNil(locationStr)
+	if locationName == nil {
+		return time.UTC
+	}
+
+	location, err := time.LoadLocation(*locationName)
+	if err != nil {
+		return time.UTC
+	}
+
+	return location
 }
 
 func (d *Database) InsertWebhook(chatID int64, threadID *int64, url, secret string) (*int64, *string, error) {
