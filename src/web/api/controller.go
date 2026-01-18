@@ -343,13 +343,23 @@ func (c *Controller) GetEventCalendar(ctx *gin.Context) {
 	secureFileName := "calendar_event"
 	if event.Name != "" {
 		acceptedChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
-		secureFileName = ""
 		eventName := strings.ReplaceAll(event.Name, " ", "_")
+
+		// Build a set of accepted characters for efficient lookup.
+		acceptedSet := make(map[rune]struct{}, len(acceptedChars))
+		for _, ch := range acceptedChars {
+			acceptedSet[ch] = struct{}{}
+		}
+
+		var builder strings.Builder
+		builder.Grow(len(eventName))
 		for _, ch := range eventName {
-			if strings.ContainsRune(acceptedChars, ch) {
-				secureFileName += string(ch)
+			if _, ok := acceptedSet[ch]; ok {
+				builder.WriteRune(ch)
 			}
 		}
+
+		secureFileName = builder.String()
 		if secureFileName == "" {
 			secureFileName = "calendar_event"
 		}
