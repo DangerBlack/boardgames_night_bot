@@ -682,7 +682,7 @@ func (d *Database) InsertParticipant(id *string, eventID string, boardgameID, us
 		newID := uuid.New().String()
 		id = &newID
 	}
-	query := `INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name, is_telegram_username) VALUES (@uuid, @event_id, @boardgame_id, @user_id, @user_name, @is_telegram_username) RETURNING uuid;`
+	query := `INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name, is_telegram_username, created_at) VALUES (@uuid, @event_id, @boardgame_id, @user_id, @user_name, @is_telegram_username, datetime('now')) RETURNING uuid;`
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
