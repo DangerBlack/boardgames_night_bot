@@ -241,8 +241,9 @@ func (d *Database) MigrateToV5() {
 		log.Fatal(err)
 	}
 
-	// Set created_at for existing participants to their insertion order (using id as proxy)
-	_, err = d.db.Exec(`UPDATE participants SET created_at = (SELECT datetime('now', '-' || (SELECT MAX(id) - id FROM participants) || ' minutes')) WHERE created_at IS NULL;`)
+	// Set created_at for existing participants based on their insertion order (using id)
+	// Each participant gets a timestamp offset by their position from the latest
+	_, err = d.db.Exec(`UPDATE participants SET created_at = datetime('now', '-' || ((SELECT MAX(id) FROM participants) - id) || ' minutes') WHERE created_at IS NULL;`)
 	if err != nil {
 		log.Printf("Warning: could not backfill created_at for existing participants: %v", err)
 	}
@@ -456,11 +457,27 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 	for _, boardGame := range boardGameMap {
 		sort.SliceStable(boardGame.Participants, func(i, j int) bool {
-			// Sort by CreatedAt if available, otherwise by UserName as fallback
+			// Sort by CreatedAt if available, otherwise by ID then UserName as fallback for deterministic ordering
 			if boardGame.Participants[i].CreatedAt != nil && boardGame.Participants[j].CreatedAt != nil {
-				return boardGame.Participants[i].CreatedAt.Before(*boardGame.Participants[j].CreatedAt)
+				if !boardGame.Participants[i].CreatedAt.Equal(*boardGame.Participants[j].CreatedAt) {
+					return boardGame.Participants[i].CreatedAt.Before(*boardGame.Participants[j].CreatedAt)
+				}
+				// Same timestamp, use ID as tie-breaker
+				if boardGame.Participants[i].ID != boardGame.Participants[j].ID {
+					return boardGame.Participants[i].ID < boardGame.Participants[j].ID
+				}
+				// Same ID (shouldn't happen), use UserName as final tie-breaker
+				return boardGame.Participants[i].UserName < boardGame.Participants[j].UserName
 			}
-			return boardGame.Participants[i].UserName < boardGame.Participants[j].UserName
+			// Handle nil CreatedAt - sort by ID first, then UserName
+			if boardGame.Participants[i].CreatedAt == nil && boardGame.Participants[j].CreatedAt == nil {
+				if boardGame.Participants[i].ID != boardGame.Participants[j].ID {
+					return boardGame.Participants[i].ID < boardGame.Participants[j].ID
+				}
+				return boardGame.Participants[i].UserName < boardGame.Participants[j].UserName
+			}
+			// If only one has nil CreatedAt, put nil ones last
+			return boardGame.Participants[i].CreatedAt != nil
 		})
 
 		event.BoardGames = append(event.BoardGames, *boardGame)

@@ -249,11 +249,12 @@
                 </p>
                 <div class="participants">
                     {{ if .Participants }}
+                    {{ $game := . }}
                     {{ range $index, $participant := .Participants }}
                     {{ $displayName := $participant.UserName }}
-                    {{ if and (gt (int $.MaxPlayers) 0) (ge $index (int $.MaxPlayers)) }}
-                        {{ $queueNum := sub $index (int $.MaxPlayers) }}
-                        {{ $displayName = printf "%s (queued %d)" $participant.UserName (add $queueNum 1) }}
+                    {{ if and (gt $game.MaxPlayers 0) (ge $index $game.MaxPlayers) }}
+                        {{ $queueNum := sub $index $game.MaxPlayers }}
+                        {{ $displayName = printf "%s %s" $participant.UserName (queuedText (add $queueNum 1) "{{.Number}}") }}
                     {{ end }}
                     <p>- {{ $displayName }}</p>
                     {{ end }}
