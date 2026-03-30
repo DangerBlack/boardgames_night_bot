@@ -252,9 +252,17 @@
                     {{ $game := . }}
                     {{ range $index, $participant := .Participants }}
                     {{ $displayName := $participant.UserName }}
-                    {{ if and (gt $game.MaxPlayers 0) (ge $index $game.MaxPlayers) }}
-                        {{ $queueNum := sub $index $game.MaxPlayers }}
-                        {{ $displayName = printf "%s %s" $participant.UserName (queuedText (add $queueNum 1) "{{.Number}}") }}
+                    {{ $isQueued := false }}
+                    {{ $queueNum := 0 }}
+                    {{ if eq $game.MaxPlayers 0 }}
+                        {{ $isQueued = true }}
+                        {{ $queueNum = add $index 1 }}
+                    {{ else if and (gt $game.MaxPlayers 0) (ge $index $game.MaxPlayers) }}
+                        {{ $isQueued = true }}
+                        {{ $queueNum = add (sub $index $game.MaxPlayers) 1 }}
+                    {{ end }}
+                    {{ if $isQueued }}
+                        {{ $displayName = printf "%s %s" $participant.UserName (queuedText $queueNum $.QueuedLang) }}
                     {{ end }}
                     <p>- {{ $displayName }}</p>
                     {{ end }}

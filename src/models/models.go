@@ -143,7 +143,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	msg := ""
 
 	complete := ""
-	isComplete := len(bg.Participants) >= int(bg.MaxPlayers)
+	isComplete := bg.MaxPlayers != -1 && len(bg.Participants) >= int(bg.MaxPlayers)
 	if isComplete {
 		complete = "🚫"
 	}

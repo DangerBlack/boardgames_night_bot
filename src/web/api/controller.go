@@ -284,6 +284,7 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 		"GameName":       localizer.MustLocalizeMessage(&i18n.Message{ID: "WebGameName"}),
 		"MaxPlayers":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
 		"AddToCalendar":  localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAddToCalendar"}),
+		"QueuedLang":     c.DB.GetPreferredLanguage(event.ChatID),
 	})
 }
 
