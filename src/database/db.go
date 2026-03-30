@@ -236,9 +236,15 @@ func (d *Database) MigrateToV4() {
 
 func (d *Database) MigrateToV5() {
 	var err error
-	_, err = d.addColumnIfNotExists("participants", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+	_, err = d.addColumnIfNotExists("participants", "created_at", "TIMESTAMP")
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Set created_at for existing participants to their insertion order (using id as proxy)
+	_, err = d.db.Exec(`UPDATE participants SET created_at = (SELECT datetime('now', '-' || (SELECT MAX(id) - id FROM participants) || ' minutes')) WHERE created_at IS NULL;`)
+	if err != nil {
+		log.Printf("Warning: could not backfill created_at for existing participants: %v", err)
 	}
 
 	log.Default().Println("database migration to v5 completed")
