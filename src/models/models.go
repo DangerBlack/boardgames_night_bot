@@ -171,7 +171,16 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 		// Skip if MaxPlayers is -1 (unlimited)
 		if maxPlayers := int(bg.MaxPlayers); maxPlayers != -1 && i >= maxPlayers {
 			queueNum := i - maxPlayers + 1
-			display = fmt.Sprintf("%s (queued %d)", display, queueNum)
+			queuedText := localizer.MustLocalize(&i18n.LocalizeConfig{
+				DefaultMessage: &i18n.Message{
+					ID:    "Queued",
+					Other: "(queued {{.Number}})",
+				},
+				TemplateData: map[string]string{
+					"Number": fmt.Sprintf("%d", queueNum),
+				},
+			})
+			display = fmt.Sprintf("%s %s", display, queuedText)
 		}
 		if p.IsTelegramUsername {
 			msg += " - @" + display + "\n"
