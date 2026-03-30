@@ -168,7 +168,8 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	for i, p := range bg.Participants {
 		display := p.UserName
 		// Calculate queue position for players beyond max capacity
-		if maxPlayers := int(bg.MaxPlayers); maxPlayers > 0 && i >= maxPlayers {
+		// Skip if MaxPlayers is -1 (unlimited)
+		if maxPlayers := int(bg.MaxPlayers); maxPlayers != -1 && i >= maxPlayers {
 			queueNum := i - maxPlayers + 1
 			display = fmt.Sprintf("%s (queued %d)", display, queueNum)
 		}
