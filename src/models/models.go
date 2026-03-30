@@ -100,11 +100,12 @@ type UpdateGameRequest struct {
 }
 
 type Participant struct {
-	ID                 int64  `json:"id"`
-	UUID               string `json:"uuid"`
-	UserID             int64  `json:"user_id"`
-	UserName           string `json:"user_name"`
-	IsTelegramUsername bool   `json:"is_telegram_username"`
+	ID                 int64      `json:"id"`
+	UUID               string     `json:"uuid"`
+	UserID             int64      `json:"user_id"`
+	UserName           string     `json:"user_name"`
+	IsTelegramUsername bool       `json:"is_telegram_username"`
+	CreatedAt          *time.Time `json:"created_at,omitempty"`
 }
 
 // create enum with value add_player
@@ -164,12 +165,18 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	}
 
 	msg += fmt.Sprintf("🎲 <b>%s [%s]</b> %s %s\n", link, name, players, complete)
-	for _, p := range bg.Participants {
+	for i, p := range bg.Participants {
+		display := p.UserName
+		// Calculate queue position for players beyond max capacity
+		if maxPlayers := int(bg.MaxPlayers); maxPlayers > 0 && i >= maxPlayers {
+			queueNum := i - maxPlayers + 1
+			display = fmt.Sprintf("%s (queued %d)", display, queueNum)
+		}
 		if p.IsTelegramUsername {
-			msg += " - @" + p.UserName + "\n"
+			msg += " - @" + display + "\n"
 			continue
 		}
-		msg += " - " + p.UserName + "\n"
+		msg += " - " + display + "\n"
 	}
 	msg += "\n"
 

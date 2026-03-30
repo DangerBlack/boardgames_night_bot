@@ -1,3 +1,7 @@
 *.sqlite
 .vscode
 .env
+bruno/*
+node/*
+test.sh
+cover.*
