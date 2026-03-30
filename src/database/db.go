@@ -104,6 +104,7 @@ func (d *Database) CreateTables() {
 			boardgame_id INTEGER,
 			user_id INTEGER,
 			user_name TEXT,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY(event_id) REFERENCES boardgames(events) ON DELETE CASCADE,
 			FOREIGN KEY(boardgame_id) REFERENCES boardgames(id) ON DELETE CASCADE,
 			UNIQUE(event_id, user_id) ON CONFLICT REPLACE
@@ -233,6 +234,16 @@ func (d *Database) MigrateToV4() {
 	log.Default().Println("database migration to v4 completed")
 }
 
+func (d *Database) MigrateToV5() {
+	var err error
+	_, err = d.addColumnIfNotExists("participants", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Default().Println("database migration to v5 completed")
+}
+
 func (d *Database) Close() {
 	d.db.Close()
 	log.Default().Println("database connection closed")
@@ -306,7 +317,8 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	p.uuid,
 	p.user_id,
 	p.user_name,
-	p.is_telegram_username
+	p.is_telegram_username,
+	p.created_at
 	FROM events e
 	LEFT JOIN boardgames b ON e.id = b.event_id
 	LEFT JOIN participants p ON b.id = p.boardgame_id
@@ -338,7 +350,8 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	p.uuid,
 	p.user_id,
 	p.user_name,
-	p.is_telegram_username
+	p.is_telegram_username,
+	p.created_at
 	FROM events e
 	LEFT JOIN boardgames b ON e.id = b.event_id
 	LEFT JOIN participants p ON b.id = p.boardgame_id
@@ -363,7 +376,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID pgtype.Int8
 		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
-		var startsAt pgtype.Timestamp
+		var startsAt, participantCreatedAt pgtype.Timestamp
 		var isTelegramUsername pgtype.Bool
 
 		if err := rows.Scan(
@@ -389,6 +402,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&participantUserID,
 			&participantUserName,
 			&isTelegramUsername,
+			&participantCreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -423,6 +437,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 				UserID:             *IntOrNil(participantUserID),
 				UserName:           *StringOrNil(participantUserName),
 				IsTelegramUsername: *BoolOrNil(isTelegramUsername),
+				CreatedAt:          TimeOrNil(participantCreatedAt),
 			}
 
 			boardGameMap[boardGame.ID].Participants = append(boardGameMap[boardGame.ID].Participants, participant)
@@ -435,6 +450,10 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 	for _, boardGame := range boardGameMap {
 		sort.SliceStable(boardGame.Participants, func(i, j int) bool {
+			// Sort by CreatedAt if available, otherwise by UserName as fallback
+			if boardGame.Participants[i].CreatedAt != nil && boardGame.Participants[j].CreatedAt != nil {
+				return boardGame.Participants[i].CreatedAt.Before(*boardGame.Participants[j].CreatedAt)
+			}
 			return boardGame.Participants[i].UserName < boardGame.Participants[j].UserName
 		})
 
