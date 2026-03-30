@@ -9,7 +9,6 @@ import (
 	"html/template"
 	"log"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -54,9 +53,17 @@ func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *teleb
 		"sub": func(a, b int) int {
 			return a - b
 		},
-		"queuedText": func(num int, format string) string {
-			// Replace {{.Number}} with the actual number
-			return strings.ReplaceAll(format, "{{.Number}}", fmt.Sprintf("%d", num))
+		"queuedText": func(num int, lang string) string {
+			localizer := i18n.NewLocalizer(bundle, lang)
+			return localizer.MustLocalize(&i18n.LocalizeConfig{
+				DefaultMessage: &i18n.Message{
+					ID:    "Queued",
+					Other: "(queued {{.Number}}°)",
+				},
+				TemplateData: map[string]string{
+					"Number": fmt.Sprintf("%d", num),
+				},
+			})
 		},
 	})
 
