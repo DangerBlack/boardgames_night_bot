@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	langpack "boardgame-night-bot/src/language"
 	"github.com/BurntSushi/toml"
@@ -247,4 +248,97 @@ func TestFormatBGUnlimitedPlayers(t *testing.T) {
 	if strings.Contains(msg, "(queued") {
 		t.Errorf("Expected no queued markers, got:\n%s", msg)
 	}
+}
+
+func TestFormatMsgFullEvent(t *testing.T) {
+	localizer := setupLocalizer()
+	webUrl := WebUrl{
+		BaseUrl:       "http://example.com",
+		BotMiniAppURL: "https://t.me/boardgame_night_bot",
+	}
+
+	bggUrl := "https://boardgamegeek.com/boardgame/174430/gloomhaven"
+	bggName := "Gloomhaven"
+	location := "Via Roma 12"
+	startsAt := mustParseTime("2026-06-01 20:00")
+
+	event := Event{
+		ID:       "test-event",
+		ChatID:   12345,
+		UserID:   1,
+		UserName: "organizer",
+		Location: &location,
+		StartsAt: &startsAt,
+		BoardGames: []BoardGame{
+			{
+				ID:         1,
+				Name:       "Gloomhaven",
+				MaxPlayers: 4,
+				BggUrl:     &bggUrl,
+				BggName:    &bggName,
+				Participants: []Participant{
+					{ID: 1, UserName: "alice", IsTelegramUsername: true},
+					{ID: 2, UserName: "bob", IsTelegramUsername: true},
+				},
+			},
+			{
+				ID:         2,
+				Name:       PLAYER_COUNTER,
+				MaxPlayers: UnlimitedPlayers,
+				Participants: []Participant{
+					{ID: 3, UserName: "carol", IsTelegramUsername: false},
+				},
+			},
+		},
+	}
+
+	msg, markup := event.FormatMsg(localizer, webUrl)
+
+	// Event header
+	if !strings.Contains(msg, "organizer") {
+		t.Errorf("Expected organizer name in message, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "Via Roma 12") {
+		t.Errorf("Expected location in message, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "2026-06-01 20:00") {
+		t.Errorf("Expected start time in message, got:\n%s", msg)
+	}
+
+	// BGG-linked game shows participant count
+	if !strings.Contains(msg, "2/4") {
+		t.Errorf("Expected participant count '2/4', got:\n%s", msg)
+	}
+
+	// Telegram usernames prefixed with @
+	if !strings.Contains(msg, "@alice") {
+		t.Errorf("Expected '@alice' in message, got:\n%s", msg)
+	}
+
+	// Non-telegram username has no @
+	if strings.Contains(msg, "@carol") {
+		t.Errorf("Expected 'carol' without @ prefix, got:\n%s", msg)
+	}
+
+	// PLAYER_COUNTER game shows localised "Join" label not raw constant
+	if strings.Contains(msg, PLAYER_COUNTER) {
+		t.Errorf("Expected PLAYER_COUNTER to be replaced by localised label, got:\n%s", msg)
+	}
+
+	// Buttons: one join per game + "not coming" + "add game"
+	totalButtons := 0
+	for _, row := range markup.InlineKeyboard {
+		totalButtons += len(row)
+	}
+	if totalButtons != 4 { // join Gloomhaven + join PLAYER_COUNTER + not coming + add game
+		t.Errorf("Expected 4 inline buttons, got %d", totalButtons)
+	}
+}
+
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse("2006-01-02 15:04", s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

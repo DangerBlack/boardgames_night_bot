@@ -125,33 +125,152 @@ func TestCreateEventWithLocationAndStartTime(t *testing.T) {
 	service := BeforeEach()
 	db := service.DB.(*mocks.MockDatabase)
 
-	db.InsertEventFunc = func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
-		if location == nil || *location != "Test Location" {
-			t.Fatalf("Expected location 'Test Location', got '%v'", location)
-		}
+	locationPropagated := false
+	startsPropagated := false
+	wantStartsAt := time.Time{}.Add(24 * time.Hour)
 
-		if startsAt == nil || !startsAt.Equal(time.Time{}.Add(24*time.Hour)) {
-			t.Fatalf("Expected startsAt '%v', got '%v'", time.Time{}.Add(24*time.Hour), startsAt)
+	db.InsertEventWithOptionalGameFunc = func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error) {
+		if location != nil && *location == "Test Location" {
+			locationPropagated = true
 		}
-
+		if startsAt != nil && startsAt.Equal(wantStartsAt) {
+			startsPropagated = true
+		}
 		return "mock-event-id", nil
 	}
 
-	isBoardGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
-		isBoardGameInserted = true
-		return 1, "mock-game-uuid", nil
-	}
-
 	location := "Test Location"
-	startsAt := time.Time{}.Add(24 * time.Hour)
-	_, err := service.CreateEvent(12345, nil, nil, 67890, "testuser", "Test Event with Location and Time", &location, &startsAt, false)
+	_, err := service.CreateEvent(12345, nil, nil, 67890, "testuser", "Test Event with Location and Time", &location, &wantStartsAt, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
+	if !locationPropagated {
+		t.Errorf("Expected location 'Test Location' to be passed to InsertEventWithOptionalGame")
+	}
+	if !startsPropagated {
+		t.Errorf("Expected startsAt to be passed to InsertEventWithOptionalGame")
+	}
+}
 
-	if isBoardGameInserted {
-		t.Errorf("Did not expect board game to be inserted")
+func TestCreateEventDBFailure(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+
+	db.InsertEventWithOptionalGameFunc = func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error) {
+		return "", fmt.Errorf("db error")
+	}
+
+	_, err := service.CreateEvent(12345, nil, nil, 67890, "testuser", "Test Event", nil, nil, false)
+	if err == nil {
+		t.Fatal("Expected error when DB fails, got nil")
+	}
+}
+
+func TestCreateGameLockedEventBlocksNonOwner(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+
+	db.SelectEventByEventIDFunc = func(eventID string) (*models.Event, error) {
+		return &models.Event{
+			ID:     eventID,
+			UserID: 99999, // owner
+			Locked: true,
+		}, nil
+	}
+
+	nonOwnerID := int64(12345)
+	_, _, err := service.CreateGame("mock-event-id", nil, nonOwnerID, "Chess", nil, nil)
+	if err == nil {
+		t.Fatal("Expected error adding game to locked event as non-owner, got nil")
+	}
+}
+
+func TestCreateGameLockedEventAllowsOwner(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	telegram := service.Bot.(*mocks.MockTelegramService)
+	ownerID := int64(99999)
+	messageID := int64(11111)
+
+	callCount := 0
+	db.SelectEventByEventIDFunc = func(eventID string) (*models.Event, error) {
+		callCount++
+		return &models.Event{
+			ID:        eventID,
+			ChatID:    12345,
+			UserID:    ownerID,
+			Locked:    true,
+			MessageID: &messageID,
+		}, nil
+	}
+	telegram.EditFunc = func(msg telebot.Editable, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+		return &telebot.Message{ID: 1}, nil
+	}
+
+	_, _, err := service.CreateGame("mock-event-id", nil, ownerID, "Chess", nil, nil)
+	if err != nil {
+		t.Fatalf("Expected owner to add game to their own locked event, got: %v", err)
+	}
+}
+
+func TestAddPlayerToPlayerCounterGame(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+	telegram := service.Bot.(*mocks.MockTelegramService)
+
+	eventID := "mock-event-id"
+	gameID := int64(1)
+	userID := int64(67890)
+	messageID := int64(11111)
+	inserted := false
+
+	db.InsertParticipantFunc = func(id *string, eID string, gID, uID int64, uName string, isTelegramUsername bool) (string, error) {
+		inserted = true
+		return "mock-pid", nil
+	}
+	db.SelectEventByEventIDFunc = func(eventID string) (*models.Event, error) {
+		return &models.Event{
+			ID:        eventID,
+			ChatID:    12345,
+			MessageID: &messageID,
+			BoardGames: []models.BoardGame{{
+				ID:           gameID,
+				Name:         models.PLAYER_COUNTER,
+				MaxPlayers:   models.UnlimitedPlayers,
+				Participants: []models.Participant{{UserID: userID, UserName: "testuser", IsTelegramUsername: true}},
+			}},
+		}, nil
+	}
+	telegram.EditFunc = func(msg telebot.Editable, what interface{}, opts ...interface{}) (*telebot.Message, error) {
+		return &telebot.Message{ID: 1}, nil
+	}
+
+	_, event, game, err := service.AddPlayer(nil, eventID, gameID, userID, "testuser", true)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if !inserted {
+		t.Error("Expected participant to be inserted")
+	}
+	if game == nil || game.Name != models.PLAYER_COUNTER {
+		t.Errorf("Expected PLAYER_COUNTER game, got %v", game)
+	}
+	if event == nil {
+		t.Error("Expected event to be returned")
+	}
+}
+
+func TestAddPlayerDBFailure(t *testing.T) {
+	service := BeforeEach()
+	db := service.DB.(*mocks.MockDatabase)
+
+	db.InsertParticipantFunc = func(id *string, eID string, gID, uID int64, uName string, isTelegramUsername bool) (string, error) {
+		return "", fmt.Errorf("unique constraint violated")
+	}
+
+	_, _, _, err := service.AddPlayer(nil, "mock-event-id", 1, 67890, "testuser", true)
+	if err == nil {
+		t.Fatal("Expected error when DB fails, got nil")
 	}
 }
 
