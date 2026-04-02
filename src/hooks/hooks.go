@@ -19,6 +19,11 @@ import (
 	"github.com/bluele/gcache"
 )
 
+// maxConcurrentDispatches is the maximum number of webhook HTTP calls that can
+// run simultaneously. Goroutines beyond this limit wait for a slot rather than
+// issuing requests immediately, bounding memory and connection usage.
+const maxConcurrentDispatches = 20
+
 // WebhookClient wraps an HTTP client with configurable timeout and retry logic.
 type WebhookClient struct {
 	DB                 *database.Database
@@ -26,6 +31,7 @@ type WebhookClient struct {
 	MaxAttempt         int
 	FailureCache       gcache.Cache
 	MaxFailuresAttempt int
+	dispatchSem        chan struct{}
 }
 
 // NewWebhookClient creates a new WebhookClient with the given timeout (TTL) and max attempts.
@@ -37,6 +43,7 @@ func NewWebhookClient(db *database.Database, timeout time.Duration, maxAttempt i
 		MaxAttempt:         maxAttempt,
 		FailureCache:       failureCache,
 		MaxFailuresAttempt: maxFailureAttempt,
+		dispatchSem:        make(chan struct{}, maxConcurrentDispatches),
 	}
 }
 
@@ -52,8 +59,11 @@ func (wc *WebhookClient) SendAllWebhookAsync(ctx context.Context, chatID int64, 
 }
 
 // SendWebhookAsync dispatches the webhook event in a separate goroutine, signing the payload with the new signature scheme.
+// A semaphore limits the number of goroutines actively making HTTP calls to maxConcurrentDispatches.
 func (wc *WebhookClient) SendWebhookAsync(ctx context.Context, chatID int64, w models.Webhook, payload models.HookWebhookEnvelope, secret string) {
 	go func() {
+		wc.dispatchSem <- struct{}{}
+		defer func() { <-wc.dispatchSem }()
 		_ = wc.SendWebhookWithRetry(ctx, chatID, w, payload, secret)
 	}()
 }
