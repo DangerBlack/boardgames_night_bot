@@ -256,6 +256,19 @@ func (d *Database) MigrateToV6() {
 	// Rebuild participants table to fix broken FK: event_id REFERENCES boardgames(events) → events(id).
 	// SQLite does not support ALTER TABLE ... DROP/ADD CONSTRAINT, so a full table rebuild is required.
 	// FK enforcement is disabled for the duration of the rebuild (recommended SQLite pattern for schema changes).
+
+	// Guard: check whether the FK is already correct by inspecting the DDL stored in sqlite_master.
+	// If the participants table already references events(id) with ON DELETE CASCADE the migration is a no-op.
+	var ddl string
+	err := d.db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='participants'`).Scan(&ddl)
+	if err != nil {
+		log.Fatal("MigrateToV6: could not read participants DDL: ", err)
+	}
+	if strings.Contains(ddl, "REFERENCES events(id) ON DELETE CASCADE") {
+		log.Default().Println("database migration to v6 already applied, skipping")
+		return
+	}
+
 	steps := []string{
 		`PRAGMA foreign_keys = OFF`,
 		`CREATE TABLE IF NOT EXISTS participants_new (
