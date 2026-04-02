@@ -53,31 +53,30 @@ func TestCreateEvent(t *testing.T) {
 	service := BeforeEach()
 	db := service.DB.(*mocks.MockDatabase)
 	telegram := service.Bot.(*mocks.MockTelegramService)
-	db.InsertEventFunc = func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
+	isEventWithGameInserted := false
+	db.InsertEventWithOptionalGameFunc = func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error) {
 		if chatID != 12345 {
 			t.Fatalf("Expected chatID 12345, got %d", chatID)
 		}
-
 		if userID != 67890 {
 			t.Fatalf("Expected userID 67890, got %d", userID)
 		}
-
 		if userName != "testuser" {
 			t.Fatalf("Expected userName 'testuser', got '%s'", userName)
 		}
-
 		if name != "Test Event" {
 			t.Fatalf("Expected event name 'Test Event', got '%s'", name)
 		}
-
 		if location != nil {
 			t.Fatalf("Expected location to be nil, got '%v'", location)
 		}
-
 		if startsAt != nil {
 			t.Fatalf("Expected startsAt to be nil, got '%v'", startsAt)
 		}
-
+		if !addPlayerCounter {
+			t.Fatalf("Expected addPlayerCounter to be true")
+		}
+		isEventWithGameInserted = true
 		return "mock-event-id", nil
 	}
 
@@ -90,15 +89,8 @@ func TestCreateEvent(t *testing.T) {
 		if messageID != responseTelegramID {
 			t.Fatalf("Expected messageID %d, got %d", responseTelegramID, messageID)
 		}
-
 		alignedTelegramMessageID = true
 		return nil
-	}
-
-	isBoardGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
-		isBoardGameInserted = true
-		return 1, "mock-game-uuid", nil
 	}
 
 	isMessageSent := false
@@ -116,8 +108,8 @@ func TestCreateEvent(t *testing.T) {
 		t.Errorf("Expected event ID 'mock-event-id', got %s", event.ID)
 	}
 
-	if !isBoardGameInserted {
-		t.Errorf("Expected board game to be inserted")
+	if !isEventWithGameInserted {
+		t.Errorf("Expected event and board game to be inserted atomically")
 	}
 
 	if !isMessageSent {

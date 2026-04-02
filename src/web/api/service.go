@@ -47,20 +47,11 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 	var eventID string
 	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", name, userName, userID, chatID)
 
-	if eventID, err = s.DB.InsertEvent(id, chatID, userID, userName, name, nil, location, startsAt); err != nil {
+	if eventID, err = s.DB.InsertEventWithOptionalGame(id, chatID, userID, userName, name, location, startsAt, allowGeneralJoin); err != nil {
 		log.Default().Println("failed to create event:", err)
 		return nil, errors.New("failed to create event")
 	}
 	log.Default().Printf("Event created with id: %s", eventID)
-
-	if allowGeneralJoin {
-		log.Default().Printf("User %s (%d) is allowed to join event %s without selecting a game", userName, userID, eventID)
-
-		if _, _, err = s.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, models.UnlimitedPlayers, nil, nil, nil, nil); err != nil {
-			log.Default().Println("failed to add game:", err)
-			return nil, errors.New("failed to add game")
-		}
-	}
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
