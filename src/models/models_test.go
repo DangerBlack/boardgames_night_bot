@@ -173,3 +173,78 @@ func TestFormatBGWithNonTelegramUsernames(t *testing.T) {
 		t.Errorf("Expected message to contain '@Player3', got:\n%s", msg)
 	}
 }
+
+func TestFormatBGZeroCapacity(t *testing.T) {
+	localizer := setupLocalizer()
+	url := WebUrl{
+		BaseUrl:       "http://example.com",
+		BotMiniAppURL: "https://t.me/boardgame_night_bot",
+	}
+
+	// MaxPlayers=0 means zero capacity: room is always full and every participant is queued
+	bg := BoardGame{
+		ID:         1,
+		UUID:       "test-uuid",
+		Name:       "Test Game",
+		MaxPlayers: 0,
+		Participants: []Participant{
+			{ID: 1, UserName: "Player1", IsTelegramUsername: true},
+			{ID: 2, UserName: "Player2", IsTelegramUsername: true},
+		},
+	}
+
+	event := Event{ID: "test-event"}
+	msg, _, err := event.FormatBG(localizer, url, bg)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Room is full
+	if !strings.Contains(msg, "🚫") {
+		t.Errorf("Expected room-full symbol 🚫, got:\n%s", msg)
+	}
+
+	// Every participant is queued
+	if !strings.Contains(msg, "Player1 (queued") {
+		t.Errorf("Expected Player1 to be queued, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "Player2 (queued") {
+		t.Errorf("Expected Player2 to be queued, got:\n%s", msg)
+	}
+}
+
+func TestFormatBGUnlimitedPlayers(t *testing.T) {
+	localizer := setupLocalizer()
+	url := WebUrl{
+		BaseUrl:       "http://example.com",
+		BotMiniAppURL: "https://t.me/boardgame_night_bot",
+	}
+
+	// MaxPlayers=UnlimitedPlayers (-1): no cap, no queue, no full marker
+	bg := BoardGame{
+		ID:         1,
+		UUID:       "test-uuid",
+		Name:       "Test Game",
+		MaxPlayers: UnlimitedPlayers,
+		Participants: []Participant{
+			{ID: 1, UserName: "Player1", IsTelegramUsername: true},
+			{ID: 2, UserName: "Player2", IsTelegramUsername: true},
+		},
+	}
+
+	event := Event{ID: "test-event"}
+	msg, _, err := event.FormatBG(localizer, url, bg)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Room is not full
+	if strings.Contains(msg, "🚫") {
+		t.Errorf("Expected no room-full symbol, got:\n%s", msg)
+	}
+
+	// No participants are queued
+	if strings.Contains(msg, "(queued") {
+		t.Errorf("Expected no queued markers, got:\n%s", msg)
+	}
+}

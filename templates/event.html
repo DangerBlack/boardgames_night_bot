@@ -255,7 +255,7 @@
                     {{ $displayName := $participant.UserName }}
                     {{ $isQueued := false }}
                     {{ $queueNum := 0 }}
-                    {{ if and (gt $maxPlayers 0) (ge $index $maxPlayers) }}
+                    {{ if and (ne $maxPlayers -1) (ge $index $maxPlayers) }}
                         {{ $isQueued = true }}
                         {{ $queueNum = add (sub $index $maxPlayers) 1 }}
                     {{ end }}
