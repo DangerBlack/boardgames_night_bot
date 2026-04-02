@@ -176,7 +176,8 @@ func (s *Service) CreateGame(
 		return nil, nil, errors.New("unable to add game to locked event")
 	}
 
-	bgCtx := context.Background()
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer bgCancel()
 
 	var bgID *int64
 	var bgName, bgUrl, bgImageUrl *string
@@ -316,7 +317,8 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 		maxPlayers = *bg.MaxPlayers
 	}
 
-	bgCtx := context.Background()
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer bgCancel()
 
 	bgID := game.BggID
 	bgName := game.BggName
