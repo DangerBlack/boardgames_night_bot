@@ -91,6 +91,8 @@ func main() {
 		bundle.MustLoadMessageFile(fmt.Sprintf("localization/active.%s.toml", lang))
 	}
 
+	langpack.ValidateKeyParity(".", lp.Languages)
+
 	if err = godotenv.Load(); err != nil {
 		log.Default().Printf("warn loading .env file: %v", err)
 	}
