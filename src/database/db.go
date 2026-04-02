@@ -105,7 +105,7 @@ func (d *Database) CreateTables() {
 			user_id INTEGER,
 			user_name TEXT,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY(event_id) REFERENCES boardgames(events) ON DELETE CASCADE,
+			FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
 			FOREIGN KEY(boardgame_id) REFERENCES boardgames(id) ON DELETE CASCADE,
 			UNIQUE(event_id, user_id) ON CONFLICT REPLACE
 		);`,
@@ -249,6 +249,52 @@ func (d *Database) MigrateToV5() {
 	}
 
 	log.Default().Println("database migration to v5 completed")
+}
+
+func (d *Database) MigrateToV6() {
+	// Rebuild participants table to fix broken FK: event_id REFERENCES boardgames(events) → events(id).
+	// SQLite does not support ALTER TABLE ... DROP/ADD CONSTRAINT, so a full table rebuild is required.
+	// FK enforcement is disabled for the duration of the rebuild (recommended SQLite pattern for schema changes).
+	steps := []string{
+		`PRAGMA foreign_keys = OFF`,
+		`CREATE TABLE IF NOT EXISTS participants_new (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
+			event_id INTEGER,
+			boardgame_id INTEGER,
+			user_id INTEGER,
+			user_name TEXT,
+			is_telegram_username BOOLEAN DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
+			FOREIGN KEY(boardgame_id) REFERENCES boardgames(id) ON DELETE CASCADE,
+			UNIQUE(event_id, user_id) ON CONFLICT REPLACE
+		)`,
+		`INSERT INTO participants_new (id, uuid, event_id, boardgame_id, user_id, user_name, is_telegram_username, created_at)
+		 SELECT id, uuid, event_id, boardgame_id, user_id, user_name, is_telegram_username, created_at FROM participants`,
+		`DROP TABLE participants`,
+		`ALTER TABLE participants_new RENAME TO participants`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS participants_uuid_idx ON participants(uuid)`,
+		`PRAGMA foreign_keys = ON`,
+	}
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, step := range steps {
+		if _, err = tx.Exec(step); err != nil {
+			tx.Rollback()
+			log.Fatal("MigrateToV6 failed at step: ", step, " error: ", err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Fatal(err)
+	}
+
+	log.Default().Println("database migration to v6 completed")
 }
 
 func (d *Database) Close() {
