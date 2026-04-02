@@ -144,7 +144,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	msg := ""
 
 	complete := ""
-	isComplete := bg.MaxPlayers > 0 && len(bg.Participants) >= int(bg.MaxPlayers)
+	isComplete := bg.MaxPlayers != UnlimitedPlayers && len(bg.Participants) >= int(bg.MaxPlayers)
 	if isComplete {
 		complete = "🚫"
 	}
@@ -170,7 +170,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 		display := p.UserName
 		// Calculate queue position for players beyond max capacity
 		// Skip if MaxPlayers is UnlimitedPlayers (-1)
-		if maxPlayers := int(bg.MaxPlayers); maxPlayers > 0 && i >= maxPlayers {
+		if maxPlayers := int(bg.MaxPlayers); maxPlayers != UnlimitedPlayers && i >= maxPlayers {
 			queueNum := i - maxPlayers + 1
 			queuedText := localizer.MustLocalize(&i18n.LocalizeConfig{
 				DefaultMessage: &i18n.Message{
