@@ -179,87 +179,16 @@ func (s *Service) CreateGame(
 	bgCtx, bgCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer bgCancel()
 
-	var bgID *int64
-	var bgName, bgUrl, bgImageUrl *string
-	var finalMaxPlayers *int = maxPlayers
-
-	if bggUrl != nil && *bggUrl != "" {
-		var valid bool
-		var id int64
-		if id, valid = models.ExtractBoardGameID(*bggUrl); !valid {
-			return nil, nil, errors.New("invalid bgg url")
-		}
-
-		var bgInfo *models.BggInfo
-		if bgInfo, err = s.BGG.ExtractCachedGameInfo(bgCtx, id, name); err != nil {
-			log.Default().Printf("Failed to get game %d: %v", id, err)
-		} else {
-			bgID = &id
-			bgName = bgInfo.Name
-			bgUrl = bgInfo.Url
-			bgImageUrl = bgInfo.ImageUrl
-
-			if finalMaxPlayers == nil || *finalMaxPlayers == 0 {
-				finalMaxPlayers = bgInfo.MaxPlayers
-			}
-		}
-	} else {
-		log.Default().Printf("Searching for game %s", name)
-		var results []gobgg.SearchResult
-
-		if results, err = s.BGG.Search(bgCtx, name); err != nil {
-			log.Default().Printf("Failed to search game %s: %v", name, err)
-		}
-
-		if len(results) == 0 {
-			log.Default().Printf("Game %s not found", name)
-		} else {
-			sort.Slice(results, func(i, j int) bool {
-				return results[i].ID < results[j].ID
-			})
-
-			url := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", results[0].ID)
-			bgUrl = &url
-			if results[0].Name != "" {
-				bgName = &results[0].Name
-			}
-
-			bgID = &results[0].ID
-
-			log.Default().Printf("Game %s id %d found: %s", name, *bgID, *bgUrl)
-
-			var things []gobgg.ThingResult
-
-			if things, err = s.BGG.GetThings(bgCtx, gobgg.GetThingIDs(*bgID)); err != nil {
-				log.Default().Printf("Failed to get game %s: %v", name, err)
-			}
-
-			if len(things) > 0 {
-				log.Default().Printf("Game details of %s found", name)
-				if things[0].MaxPlayers > 0 && finalMaxPlayers == nil {
-					finalMaxPlayers = &things[0].MaxPlayers
-				}
-
-				if things[0].Name != "" {
-					bgName = &things[0].Name
-				} else {
-					bgName = &name
-				}
-				if things[0].Image != "" {
-					bgImageUrl = &things[0].Image
-				}
-			}
-		}
+	bgID, bgInfo, err := s.fetchBGGInfo(bgCtx, bggUrl, name)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	if finalMaxPlayers == nil {
-		defaultMax := 5
-		finalMaxPlayers = &defaultMax
-	}
+	finalMaxPlayers := resolveMaxPlayers(maxPlayers, bgInfo.MaxPlayers)
 
 	log.Default().Printf("Inserting %s in the db", name)
 
-	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, *finalMaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
+	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, finalMaxPlayers, bgID, bgInfo.Name, bgInfo.Url, bgInfo.ImageUrl); err != nil {
 		log.Default().Println("failed to insert board game:", err)
 		return nil, nil, fmt.Errorf("failed to insert board game: %w", err)
 	}
@@ -279,6 +208,79 @@ func (s *Service) CreateGame(
 	log.Default().Printf("Game %s created in event %s", name, event.Name)
 
 	return event, game, nil
+}
+
+// fetchBGGInfo retrieves BGG metadata for a game. If bggUrl is provided it
+// fetches by URL; otherwise it searches BGG by name. BGG network errors are
+// non-fatal — the caller receives whatever partial data was obtained.
+// Returns an error only for invalid BGG URLs.
+func (s *Service) fetchBGGInfo(ctx context.Context, bggUrl *string, name string) (bgID *int64, info models.BggInfo, err error) {
+	if bggUrl != nil && *bggUrl != "" {
+		var id int64
+		var valid bool
+		if id, valid = models.ExtractBoardGameID(*bggUrl); !valid {
+			return nil, models.BggInfo{}, errors.New("invalid bgg url")
+		}
+
+		var bgInfo *models.BggInfo
+		if bgInfo, err = s.BGG.ExtractCachedGameInfo(ctx, id, name); err != nil {
+			log.Default().Printf("Failed to get BGG info for id %d: %v", id, err)
+			return nil, models.BggInfo{}, nil
+		}
+
+		return &id, *bgInfo, nil
+	}
+
+	// No URL — search by name
+	log.Default().Printf("Searching BGG for game: %s", name)
+	results, searchErr := s.BGG.Search(ctx, name)
+	if searchErr != nil || len(results) == 0 {
+		log.Default().Printf("BGG search for %q returned no results: %v", name, searchErr)
+		return nil, models.BggInfo{}, nil
+	}
+
+	sort.Slice(results, func(i, j int) bool { return results[i].ID < results[j].ID })
+
+	bgURL := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d", results[0].ID)
+	info.Url = &bgURL
+	if results[0].Name != "" {
+		info.Name = &results[0].Name
+	}
+	bgID = &results[0].ID
+	log.Default().Printf("BGG search matched %q → id %d", name, *bgID)
+
+	things, thingErr := s.BGG.GetThings(ctx, gobgg.GetThingIDs(*bgID))
+	if thingErr != nil || len(things) == 0 {
+		log.Default().Printf("Failed to get BGG thing details for %d: %v", *bgID, thingErr)
+		return bgID, info, nil
+	}
+
+	t := things[0]
+	if t.MaxPlayers > 0 {
+		info.MaxPlayers = &t.MaxPlayers
+	}
+	if t.Name != "" {
+		info.Name = &t.Name
+	} else {
+		info.Name = &name
+	}
+	if t.Image != "" {
+		info.ImageUrl = &t.Image
+	}
+
+	return bgID, info, nil
+}
+
+// resolveMaxPlayers picks the final max-player value: prefer the user-supplied
+// value, fall back to BGG data, and default to 5 if neither is available.
+func resolveMaxPlayers(requested *int, fromBGG *int) int {
+	if requested != nil && *requested != 0 {
+		return *requested
+	}
+	if fromBGG != nil {
+		return *fromBGG
+	}
+	return 5
 }
 
 // lockGame returns a function that unlocks the per-game mutex for gameID.
