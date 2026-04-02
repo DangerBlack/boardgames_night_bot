@@ -23,7 +23,7 @@ import (
 )
 
 var dateTimeRegex = regexp.MustCompile(`\d{2}-\d{2}-\d{4} \d{2}:\d{2}`)
-var locationRegex = regexp.MustCompile(`📍([^\n]+)\n`)
+var locationRegex = regexp.MustCompile(`📍([^\n]+?)(?:\n|$)`)
 
 type Telegram struct {
 	Bot            *telebot.Bot
