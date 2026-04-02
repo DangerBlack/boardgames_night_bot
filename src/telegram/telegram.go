@@ -166,7 +166,13 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
 		return c.Reply(usageT, markup)
 	}
+	// Build event name from args, then strip metadata markers so that
+	// "/create 👥 SPASSOLA 01-04-2026 20:30\n📍Rome" → "SPASSOLA"
 	eventName := strings.Join(args[0:], " ")
+	eventName = locationRegex.ReplaceAllString(eventName, "")
+	eventName = dateTimeRegex.ReplaceAllString(eventName, "")
+	eventName = strings.ReplaceAll(eventName, "👥", "")
+	eventName = strings.TrimSpace(eventName)
 	userID := c.Sender().ID
 	userName, _ := DefineUsername(c.Sender())
 	chatID := c.Chat().ID
