@@ -630,7 +630,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 			UserID:     event.UserID,
 			UserName:   event.UserName,
 			Name:       bg.Name,
-			MaxPlayers: *bg.MaxPlayers,
+			MaxPlayers: int(game.MaxPlayers),
 			MessageID:  nil,
 			BGG: models.HookBGGInfo{
 				IsSet:    game.BggID != nil,
