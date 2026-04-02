@@ -5,3 +5,4 @@ bruno/*
 node/*
 test.sh
 cover.*
+docs/issues/*
