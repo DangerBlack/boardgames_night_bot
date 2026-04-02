@@ -22,8 +22,8 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-var dateTimeRegex = `\d{2}-\d{2}-\d{4} \d{2}:\d{2}`
-var locationRegex = `📍(.+)\n`
+var dateTimeRegex = regexp.MustCompile(`\d{2}-\d{2}-\d{4} \d{2}:\d{2}`)
+var locationRegex = regexp.MustCompile(`📍([^\n]+)\n`)
 
 type Telegram struct {
 	Bot            *telebot.Bot
@@ -181,18 +181,11 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	log.Default().Println("Full text for parsing:", fullText)
 
 	// check regex for datetime at the end of the event name DD-MM-YYYY HH:MM
-	matched, err := regexp.MatchString(dateTimeRegex, fullText)
-	if err != nil {
-		log.Default().Println("failed to parse date time:", err)
-	}
-	if matched {
+	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
 		tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
 		log.Default().Printf("Using location %s for chat %d", tzLocation.String(), chatID)
 
-		re := regexp.MustCompile(dateTimeRegex)
-		dateTimeStr := re.FindString(fullText)
 		layout := "02-01-2006 15:04"
-
 		t, err := time.ParseInLocation(layout, dateTimeStr, tzLocation)
 		if err != nil {
 			log.Default().Println("failed to parse date time:", err)
@@ -203,18 +196,10 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	}
 
 	// check regex for location
-	matchedLoc, err := regexp.MatchString(locationRegex, fullText)
-	if err != nil {
-		log.Default().Println("failed to parse location:", err)
-	}
-	if matchedLoc {
-		re := regexp.MustCompile(locationRegex)
-		locationStr := re.FindStringSubmatch(fullText)
-		if len(locationStr) > 1 {
-			loc := strings.TrimSpace(locationStr[1])
-			log.Default().Printf("Parsed location: %s\n", loc)
-			location = &loc
-		}
+	if locationStr := locationRegex.FindStringSubmatch(fullText); len(locationStr) > 1 {
+		loc := strings.TrimSpace(locationStr[1])
+		log.Default().Printf("Parsed location: %s\n", loc)
+		location = &loc
 	}
 
 	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
