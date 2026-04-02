@@ -14,6 +14,7 @@ import (
 )
 
 const PLAYER_COUNTER = "_PLAYER_COUNTER_"
+const UnlimitedPlayers = -1
 
 type Event struct {
 	ID         string
@@ -143,7 +144,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	msg := ""
 
 	complete := ""
-	isComplete := bg.MaxPlayers != -1 && len(bg.Participants) >= int(bg.MaxPlayers)
+	isComplete := bg.MaxPlayers > 0 && len(bg.Participants) >= int(bg.MaxPlayers)
 	if isComplete {
 		complete = "🚫"
 	}
@@ -160,7 +161,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 
 	maxPlayer := bg.MaxPlayers
 	players := fmt.Sprintf("(%d/%d %s)", len(bg.Participants), bg.MaxPlayers, localizer.MustLocalizeMessage(&i18n.Message{ID: "Players"}))
-	if maxPlayer == -1 {
+	if maxPlayer == UnlimitedPlayers {
 		players = fmt.Sprintf("(%d %s)", len(bg.Participants), localizer.MustLocalizeMessage(&i18n.Message{ID: "Players"}))
 	}
 
@@ -168,8 +169,8 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 	for i, p := range bg.Participants {
 		display := p.UserName
 		// Calculate queue position for players beyond max capacity
-		// Skip if MaxPlayers is -1 (unlimited)
-		if maxPlayers := int(bg.MaxPlayers); maxPlayers != -1 && i >= maxPlayers {
+		// Skip if MaxPlayers is UnlimitedPlayers (-1)
+		if maxPlayers := int(bg.MaxPlayers); maxPlayers > 0 && i >= maxPlayers {
 			queueNum := i - maxPlayers + 1
 			queuedText := localizer.MustLocalize(&i18n.LocalizeConfig{
 				DefaultMessage: &i18n.Message{

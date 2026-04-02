@@ -250,16 +250,14 @@
                 <div class="participants">
                     {{ if .Participants }}
                     {{ $game := . }}
+                    {{ $maxPlayers := int $game.MaxPlayers }}
                     {{ range $index, $participant := .Participants }}
                     {{ $displayName := $participant.UserName }}
                     {{ $isQueued := false }}
                     {{ $queueNum := 0 }}
-                    {{ if eq $game.MaxPlayers 0 }}
+                    {{ if and (gt $maxPlayers 0) (ge $index $maxPlayers) }}
                         {{ $isQueued = true }}
-                        {{ $queueNum = add $index 1 }}
-                    {{ else if and (gt $game.MaxPlayers 0) (ge $index $game.MaxPlayers) }}
-                        {{ $isQueued = true }}
-                        {{ $queueNum = add (sub $index $game.MaxPlayers) 1 }}
+                        {{ $queueNum = add (sub $index $maxPlayers) 1 }}
                     {{ end }}
                     {{ if $isQueued }}
                         {{ $displayName = printf "%s %s" $participant.UserName (queuedText $queueNum $.QueuedLang) }}

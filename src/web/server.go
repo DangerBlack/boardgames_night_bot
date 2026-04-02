@@ -54,11 +54,11 @@ func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *teleb
 			return a - b
 		},
 		"queuedText": func(num int, lang string) string {
-			localizer := i18n.NewLocalizer(bundle, lang)
+			localizer := i18n.NewLocalizer(bundle, lang, "en")
 			return localizer.MustLocalize(&i18n.LocalizeConfig{
 				DefaultMessage: &i18n.Message{
 					ID:    "Queued",
-					Other: "(queued {{.Number}}°)",
+					Other: "(queued {{.Number}})",
 				},
 				TemplateData: map[string]string{
 					"Number": fmt.Sprintf("%d", num),

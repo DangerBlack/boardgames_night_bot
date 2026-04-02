@@ -264,7 +264,7 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 				UserID:     userID,
 				UserName:   userName,
 				Name:       models.PLAYER_COUNTER,
-				MaxPlayers: -1,
+				MaxPlayers: models.UnlimitedPlayers,
 				MessageID:  event.MessageID,
 				BGG: models.HookBGGInfo{
 					IsSet: false,
