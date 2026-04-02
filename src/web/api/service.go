@@ -56,7 +56,7 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 	if allowGeneralJoin {
 		log.Default().Printf("User %s (%d) is allowed to join event %s without selecting a game", userName, userID, eventID)
 
-		if _, _, err = s.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, -1, nil, nil, nil, nil); err != nil {
+		if _, _, err = s.DB.InsertBoardGame(eventID, nil, models.PLAYER_COUNTER, models.UnlimitedPlayers, nil, nil, nil, nil); err != nil {
 			log.Default().Println("failed to add game:", err)
 			return nil, errors.New("failed to add game")
 		}
