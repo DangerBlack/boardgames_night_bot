@@ -331,4 +331,9 @@ func formatTimePtr(t *time.Time) *string {
 	return &str
 }
 
-const MessageUnchangedErrorMessage = "specified new message content and reply markup are exactly the same as a current content and reply markup of the message"
+// MessageUnchangedErrorMessage is a substring of the Telegram API error returned
+// when an edit request contains identical content to the current message.
+// We match a substring rather than the full sentence to stay resilient to
+// minor wording changes in the Telegram API. This is not a real error — the
+// desired state is already in place — so callers should treat it as a no-op.
+const MessageUnchangedErrorMessage = "message is not modified"

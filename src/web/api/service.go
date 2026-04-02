@@ -507,9 +507,11 @@ func (s *Service) updateTelegram(eventID string) (*models.Event, error) {
 		},
 	}, body, markup, telebot.NoPreview)
 	if err != nil {
-		log.Default().Println("failed to edit message", err)
 		if strings.Contains(err.Error(), models.MessageUnchangedErrorMessage) {
-			log.Default().Println("failed because unchanged", err)
+			// Content is already up-to-date; not a real error.
+			err = nil
+		} else {
+			log.Default().Println("failed to edit message:", err)
 		}
 	}
 
