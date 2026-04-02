@@ -6,104 +6,173 @@ import (
 	"time"
 )
 
-func strPtr(s string) *string { return &s }
+func strPtr(s string) *string    { return &s }
 func timePtr(t time.Time) *time.Time { return &t }
 
-func TestParseCreateArgs(t *testing.T) {
+var (
+	isoTime   = timePtr(time.Date(2025, 6, 1, 20, 0, 0, 0, time.UTC))
+	ddmmTime  = timePtr(time.Date(2026, 4, 1, 20, 30, 0, 0, time.UTC))
+)
+
+// TestParseCreateCommandPermutations covers all 16 combinations of
+// join(👥) × name × location × time, plus both time formats where applicable.
+func TestParseCreateCommandPermutations(t *testing.T) {
 	tests := []struct {
-		name            string
-		args            []string
-		fullText        string
-		wantName        string
-		wantLocation    *string
-		wantAllowJoin   bool
-		wantStartsAtNil bool
-		wantStartsAt    *time.Time
+		name          string
+		args          []string
+		fullText      string
+		wantName      string
+		wantLocation  *string
+		wantAllowJoin bool
+		wantStartsAt  *time.Time
 	}{
+		// ── no join ──────────────────────────────────────────────────────────
 		{
-			name:            "location on last line (no trailing newline)",
-			args:            []string{"👥", "SPASSOLA"},
-			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("grottaminchia"),
-			wantAllowJoin:   true,
-			wantStartsAtNil: true,
+			name:     "name only",
+			args:     []string{"SPASSOLA"},
+			fullText: "/create SPASSOLA",
+			wantName: "SPASSOLA",
 		},
 		{
-			name:            "location on middle line",
-			args:            []string{"👥", "SPASSOLA"},
-			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia\nsome extra",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("grottaminchia"),
-			wantAllowJoin:   true,
-			wantStartsAtNil: true,
+			name:         "name + location",
+			args:         []string{"SPASSOLA"},
+			fullText:     "/create SPASSOLA\n📍Via Roma",
+			wantName:     "SPASSOLA",
+			wantLocation: strPtr("Via Roma"),
 		},
 		{
-			name:            "no location",
-			args:            []string{"👥", "SPASSOLA"},
-			fullText:        "/create 👥 SPASSOLA",
-			wantName:        "SPASSOLA",
-			wantLocation:    nil,
-			wantAllowJoin:   true,
-			wantStartsAtNil: true,
+			name:         "name + ISO time",
+			args:         []string{"SPASSOLA", "2025-06-01", "20:00"},
+			fullText:     "/create SPASSOLA 2025-06-01 20:00",
+			wantName:     "SPASSOLA",
+			wantStartsAt: isoTime,
 		},
 		{
-			name:            "no general join flag",
-			args:            []string{"SPASSOLA"},
-			fullText:        "/create SPASSOLA\n📍grottaminchia",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("grottaminchia"),
-			wantAllowJoin:   false,
-			wantStartsAtNil: true,
+			name:         "name + DD-MM-YYYY time",
+			args:         []string{"SPASSOLA", "01-04-2026", "20:30"},
+			fullText:     "/create SPASSOLA 01-04-2026 20:30",
+			wantName:     "SPASSOLA",
+			wantStartsAt: ddmmTime,
 		},
 		{
-			name:            "ISO date format YYYY-MM-DD",
-			args:            []string{"SPASSOLA", "2025-06-01", "20:00"},
-			fullText:        "/create SPASSOLA 2025-06-01 20:00\n📍grottaminchia",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("grottaminchia"),
-			wantAllowJoin:   false,
-			wantStartsAtNil: false,
-			wantStartsAt:    timePtr(time.Date(2025, 6, 1, 20, 0, 0, 0, time.UTC)),
+			name:         "name + location + ISO time",
+			args:         []string{"SPASSOLA", "2025-06-01", "20:00"},
+			fullText:     "/create SPASSOLA 2025-06-01 20:00\n📍Via Roma",
+			wantName:     "SPASSOLA",
+			wantLocation: strPtr("Via Roma"),
+			wantStartsAt: isoTime,
 		},
 		{
-			name:            "DD-MM-YYYY date format with @bot suffix",
-			args:            []string{"👥", "01-04-2026", "20:30"},
-			fullText:        "/create@bg_night_bot 👥 01-04-2026 20:30",
-			wantName:        "",
-			wantLocation:    nil,
-			wantAllowJoin:   true,
-			wantStartsAtNil: false,
-			wantStartsAt:    timePtr(time.Date(2026, 4, 1, 20, 30, 0, 0, time.UTC)),
+			name:         "name + location + DD-MM-YYYY time",
+			args:         []string{"SPASSOLA", "01-04-2026", "20:30"},
+			fullText:     "/create SPASSOLA 01-04-2026 20:30\n📍Via Roma",
+			wantName:     "SPASSOLA",
+			wantLocation: strPtr("Via Roma"),
+			wantStartsAt: ddmmTime,
 		},
 		{
-			name:            "DD-MM-YYYY with name — name must not contain date or 👥",
-			args:            []string{"👥", "SPASSOLA", "01-04-2026", "20:30"},
-			fullText:        "/create@bg_night_bot 👥 SPASSOLA 01-04-2026 20:30",
-			wantName:        "SPASSOLA",
-			wantLocation:    nil,
-			wantAllowJoin:   true,
-			wantStartsAtNil: false,
-			wantStartsAt:    timePtr(time.Date(2026, 4, 1, 20, 30, 0, 0, time.UTC)),
+			name:         "location only (no name)",
+			args:         []string{},
+			fullText:     "/create\n📍Via Roma",
+			wantName:     "",
+			wantLocation: strPtr("Via Roma"),
 		},
 		{
-			name:            "ISO date on last line",
-			args:            []string{"👥", "SPASSOLA"},
-			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("grottaminchia"),
-			wantAllowJoin:   true,
-			wantStartsAtNil: false,
-			wantStartsAt:    timePtr(time.Date(2023, 12, 31, 20, 30, 0, 0, time.UTC)),
+			name:         "time only (no name)",
+			args:         []string{"2025-06-01", "20:00"},
+			fullText:     "/create 2025-06-01 20:00",
+			wantName:     "",
+			wantStartsAt: isoTime,
+		},
+
+		// ── with join (👥) ────────────────────────────────────────────────────
+		{
+			name:          "join + name only",
+			args:          []string{"👥", "SPASSOLA"},
+			fullText:      "/create 👥 SPASSOLA",
+			wantName:      "SPASSOLA",
+			wantAllowJoin: true,
 		},
 		{
-			name:            "location with spaces",
-			args:            []string{"SPASSOLA"},
-			fullText:        "/create SPASSOLA\n📍Via Roma 12, Milano",
-			wantName:        "SPASSOLA",
-			wantLocation:    strPtr("Via Roma 12, Milano"),
-			wantAllowJoin:   false,
-			wantStartsAtNil: true,
+			name:          "join + name + location",
+			args:          []string{"👥", "SPASSOLA"},
+			fullText:      "/create 👥 SPASSOLA\n📍Via Roma",
+			wantName:      "SPASSOLA",
+			wantLocation:  strPtr("Via Roma"),
+			wantAllowJoin: true,
+		},
+		{
+			name:          "join + name + ISO time",
+			args:          []string{"👥", "SPASSOLA", "2025-06-01", "20:00"},
+			fullText:      "/create 👥 SPASSOLA 2025-06-01 20:00",
+			wantName:      "SPASSOLA",
+			wantAllowJoin: true,
+			wantStartsAt:  isoTime,
+		},
+		{
+			name:          "join + name + DD-MM-YYYY time",
+			args:          []string{"👥", "SPASSOLA", "01-04-2026", "20:30"},
+			fullText:      "/create 👥 SPASSOLA 01-04-2026 20:30",
+			wantName:      "SPASSOLA",
+			wantAllowJoin: true,
+			wantStartsAt:  ddmmTime,
+		},
+		{
+			name:          "join + name + location + ISO time",
+			args:          []string{"👥", "SPASSOLA", "2025-06-01", "20:00"},
+			fullText:      "/create 👥 SPASSOLA 2025-06-01 20:00\n📍Via Roma",
+			wantName:      "SPASSOLA",
+			wantLocation:  strPtr("Via Roma"),
+			wantAllowJoin: true,
+			wantStartsAt:  isoTime,
+		},
+		{
+			name:          "join + name + location + DD-MM-YYYY time",
+			args:          []string{"👥", "SPASSOLA", "01-04-2026", "20:30"},
+			fullText:      "/create 👥 SPASSOLA 01-04-2026 20:30\n📍Via Roma",
+			wantName:      "SPASSOLA",
+			wantLocation:  strPtr("Via Roma"),
+			wantAllowJoin: true,
+			wantStartsAt:  ddmmTime,
+		},
+		{
+			name:          "join + location only (no name)",
+			args:          []string{"👥"},
+			fullText:      "/create 👥\n📍Via Roma",
+			wantName:      "",
+			wantLocation:  strPtr("Via Roma"),
+			wantAllowJoin: true,
+		},
+		{
+			name:          "join + ISO time only (no name)",
+			args:          []string{"👥", "2025-06-01", "20:00"},
+			fullText:      "/create 👥 2025-06-01 20:00",
+			wantName:      "",
+			wantAllowJoin: true,
+			wantStartsAt:  isoTime,
+		},
+		// ── edge cases ────────────────────────────────────────────────────────
+		{
+			name:         "location on last line (no trailing newline)",
+			args:         []string{"SPASSOLA"},
+			fullText:     "/create SPASSOLA\n📍grottaminchia",
+			wantName:     "SPASSOLA",
+			wantLocation: strPtr("grottaminchia"),
+		},
+		{
+			name:         "location with spaces",
+			args:         []string{"SPASSOLA"},
+			fullText:     "/create SPASSOLA\n📍Via Roma 12, Milano",
+			wantName:     "SPASSOLA",
+			wantLocation: strPtr("Via Roma 12, Milano"),
+		},
+		{
+			name:          "@bot suffix in command",
+			args:          []string{"👥", "01-04-2026", "20:30"},
+			fullText:      "/create@bg_night_bot 👥 01-04-2026 20:30",
+			wantName:      "",
+			wantAllowJoin: true,
+			wantStartsAt:  ddmmTime,
 		},
 	}
 
@@ -114,7 +183,6 @@ func TestParseCreateArgs(t *testing.T) {
 			if gotName != tc.wantName {
 				t.Errorf("name: got %q, want %q", gotName, tc.wantName)
 			}
-
 			if tc.wantLocation == nil && gotLocation != nil {
 				t.Errorf("location: got %q, want nil", *gotLocation)
 			} else if tc.wantLocation != nil && gotLocation == nil {
@@ -122,25 +190,21 @@ func TestParseCreateArgs(t *testing.T) {
 			} else if tc.wantLocation != nil && gotLocation != nil && *gotLocation != *tc.wantLocation {
 				t.Errorf("location: got %q, want %q", *gotLocation, *tc.wantLocation)
 			}
-
 			if gotAllowJoin != tc.wantAllowJoin {
 				t.Errorf("allowGeneralJoin: got %v, want %v", gotAllowJoin, tc.wantAllowJoin)
 			}
-
-			if tc.wantStartsAtNil && gotStartsAt != nil {
+			if tc.wantStartsAt == nil && gotStartsAt != nil {
 				t.Errorf("startsAt: got %v, want nil", *gotStartsAt)
-			}
-			if !tc.wantStartsAtNil && gotStartsAt == nil {
-				t.Errorf("startsAt: got nil, want non-nil")
-			}
-			if tc.wantStartsAt != nil && gotStartsAt != nil && !gotStartsAt.Equal(*tc.wantStartsAt) {
+			} else if tc.wantStartsAt != nil && gotStartsAt == nil {
+				t.Errorf("startsAt: got nil, want %v", *tc.wantStartsAt)
+			} else if tc.wantStartsAt != nil && gotStartsAt != nil && !gotStartsAt.Equal(*tc.wantStartsAt) {
 				t.Errorf("startsAt: got %v, want %v", *gotStartsAt, *tc.wantStartsAt)
 			}
 		})
 	}
 }
 
-func TestParseCreateArgsNameDoesNotContainMetadata(t *testing.T) {
+func TestParseCreateCommandNameDoesNotContainMetadata(t *testing.T) {
 	// Regression: event name was including the date/location/👥 markers
 	args := []string{"👥", "SPASSOLA\n📍grottaminchia\n2023-12-31", "20:30"}
 	fullText := "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30"
