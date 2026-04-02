@@ -23,6 +23,7 @@ type DatabaseService interface {
 	CreateTables()
 	Close()
 	InsertEvent(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
+	InsertEventWithOptionalGame(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error)
 	SelectEvent(chatID int64) (*models.Event, error)
 	SelectEventByEventID(eventID string) (*models.Event, error)
 	DeleteEvent(id string) error
@@ -344,6 +345,65 @@ func (d *Database) InsertEvent(id *string, chatID, userID int64, userName, name 
 	}
 
 	return eventID, nil
+}
+
+// InsertEventWithOptionalGame atomically inserts an event and, when addPlayerCounter
+// is true, also inserts the PLAYER_COUNTER game. Both writes share a single transaction
+// so a failure mid-way leaves no partial state in the database.
+func (d *Database) InsertEventWithOptionalGame(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var eventID string
+	if id != nil {
+		eventID = *id
+	} else {
+		eventID = uuid.New().String()
+	}
+
+	eventQuery := `INSERT INTO events
+	(id, chat_id, user_id, user_name, name, location, starts_at)
+	VALUES (
+		@event_id, @chat_id, @user_id, @user_name, @name,
+		COALESCE(@location, (SELECT default_location FROM chats WHERE chat_id = @chat_id)),
+		@starts_at
+	)
+	RETURNING id;`
+
+	if err = tx.QueryRow(eventQuery,
+		NamedArgs(map[string]any{
+			"event_id":  eventID,
+			"chat_id":   chatID,
+			"user_id":   userID,
+			"user_name": userName,
+			"name":      name,
+			"location":  location,
+			"starts_at": startsAt,
+		})...,
+	).Scan(&eventID); err != nil {
+		return "", err
+	}
+
+	if addPlayerCounter {
+		gameUUID := uuid.New().String()
+		gameQuery := `INSERT INTO boardgames (event_id, uuid, name, max_players) VALUES (@event_id, @uuid, @name, @max_players) RETURNING id;`
+		var gameID int64
+		if err = tx.QueryRow(gameQuery,
+			NamedArgs(map[string]any{
+				"event_id":    eventID,
+				"uuid":        gameUUID,
+				"name":        models.PLAYER_COUNTER,
+				"max_players": models.UnlimitedPlayers,
+			})...,
+		).Scan(&gameID); err != nil {
+			return "", err
+		}
+	}
+
+	return eventID, tx.Commit()
 }
 
 func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {

@@ -7,8 +7,9 @@ import (
 )
 
 type MockDatabase struct {
-	InsertEventFunc                func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
-	InsertBoardGameFunc            func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	InsertEventFunc                        func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
+	InsertEventWithOptionalGameFunc        func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error)
+	InsertBoardGameFunc                    func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
 	UpdateBoardGameBGGInfoByIDFunc func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
 	UpdateEventMessageIDFunc       func(eventID string, messageID int64) error
 	DeleteBoardGameByIDFunc        func(ID string) error
@@ -29,6 +30,13 @@ func (m *MockDatabase) Close() {}
 func (m *MockDatabase) InsertEvent(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error) {
 	if m.InsertEventFunc != nil {
 		return m.InsertEventFunc(id, chatID, userID, userName, name, messageID, location, startsAt)
+	}
+	return "mock-event-id", nil
+}
+
+func (m *MockDatabase) InsertEventWithOptionalGame(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error) {
+	if m.InsertEventWithOptionalGameFunc != nil {
+		return m.InsertEventWithOptionalGameFunc(id, chatID, userID, userName, name, location, startsAt, addPlayerCounter)
 	}
 	return "mock-event-id", nil
 }
