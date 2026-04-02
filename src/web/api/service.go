@@ -12,6 +12,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DangerBlack/gobgg"
@@ -26,6 +27,7 @@ type Service struct {
 	Bot            telegram_interface.TelegramService
 	LanguageBundle *i18n.Bundle
 	Url            models.WebUrl
+	gameUpdateMu   sync.Map // map[int64]*sync.Mutex — serialises concurrent updates per game ID
 }
 
 func NewService(db database.DatabaseService, bgg bgg.BGGService, bot telegram_interface.TelegramService, languageBundle *i18n.Bundle, url models.WebUrl) *Service {
@@ -278,7 +280,17 @@ func (s *Service) CreateGame(
 	return event, game, nil
 }
 
+// lockGame returns a function that unlocks the per-game mutex for gameID.
+// Callers must defer the returned unlock to ensure the lock is always released.
+func (s *Service) lockGame(gameID int64) func() {
+	v, _ := s.gameUpdateMu.LoadOrStore(gameID, &sync.Mutex{})
+	mu := v.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
 func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg models.UpdateGameRequest) (*models.Event, *models.BoardGame, error) {
+	defer s.lockGame(gameID)()
 	var err error
 	var event *models.Event
 	var game *models.BoardGame
