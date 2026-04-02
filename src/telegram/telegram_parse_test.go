@@ -9,7 +9,7 @@ import (
 // parseCreateArgs mirrors the parsing logic inside CreateGame so it can be
 // unit-tested without a live bot context.
 func parseCreateArgs(fullText string) (eventName string, location *string, startsAt *time.Time, allowGeneralJoin bool) {
-	// Strip the /create command prefix before processing args
+	// Strip the /create (or /create@bot_name) command prefix before processing args
 	text := strings.TrimSpace(fullText)
 	if idx := strings.Index(text, " "); idx != -1 {
 		text = strings.TrimSpace(text[idx+1:])
@@ -26,9 +26,15 @@ func parseCreateArgs(fullText string) (eventName string, location *string, start
 	eventName = strings.TrimSpace(eventName)
 
 	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
-		layout := "02-01-2006 15:04"
-		parsed, err := time.ParseInLocation(layout, dateTimeStr, time.UTC)
-		if err == nil {
+		var parsed time.Time
+		var parseErr error
+		for _, layout := range []string{"02-01-2006 15:04", "2006-01-02 15:04"} {
+			parsed, parseErr = time.ParseInLocation(layout, dateTimeStr, time.UTC)
+			if parseErr == nil {
+				break
+			}
+		}
+		if parseErr == nil {
 			startsAt = &parsed
 		}
 	}
@@ -46,12 +52,13 @@ func strPtr(s string) *string { return &s }
 
 func TestParseCreateArgs(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            string
-		wantName         string
-		wantLocation     *string
-		wantAllowJoin    bool
-		wantStartsAtNil  bool
+		name            string
+		input           string
+		wantName        string
+		wantLocation    *string
+		wantAllowJoin   bool
+		wantStartsAtNil bool
+		wantStartsAt    *time.Time
 	}{
 		{
 			name:            "location on last line (no trailing newline)",
@@ -86,12 +93,31 @@ func TestParseCreateArgs(t *testing.T) {
 			wantStartsAtNil: true,
 		},
 		{
-			name:            "with datetime and location",
-			input:           "/create SPASSOLA 01-06-2025 20:00\n📍grottaminchia",
+			name:            "ISO date format YYYY-MM-DD with location",
+			input:           "/create SPASSOLA 2025-06-01 20:00\n📍grottaminchia",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   false,
 			wantStartsAtNil: false,
+			wantStartsAt:    timePtr(time.Date(2025, 6, 1, 20, 0, 0, 0, time.UTC)),
+		},
+		{
+			name:            "DD-MM-YYYY date format with @bot suffix",
+			input:           "/create@bg_night_bot 👥 01-04-2026 20:30",
+			wantName:        "",
+			wantLocation:    nil,
+			wantAllowJoin:   true,
+			wantStartsAtNil: false,
+			wantStartsAt:    timePtr(time.Date(2026, 4, 1, 20, 30, 0, 0, time.UTC)),
+		},
+		{
+			name:            "ISO date on last line",
+			input:           "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30",
+			wantName:        "SPASSOLA",
+			wantLocation:    strPtr("grottaminchia"),
+			wantAllowJoin:   true,
+			wantStartsAtNil: false,
+			wantStartsAt:    timePtr(time.Date(2023, 12, 31, 20, 30, 0, 0, time.UTC)),
 		},
 		{
 			name:            "location with spaces",
@@ -129,6 +155,11 @@ func TestParseCreateArgs(t *testing.T) {
 			if !tc.wantStartsAtNil && gotStartsAt == nil {
 				t.Errorf("startsAt: got nil, want non-nil")
 			}
+			if tc.wantStartsAt != nil && gotStartsAt != nil && !gotStartsAt.Equal(*tc.wantStartsAt) {
+				t.Errorf("startsAt: got %v, want %v", *gotStartsAt, *tc.wantStartsAt)
+			}
 		})
 	}
 }
+
+func timePtr(t time.Time) *time.Time { return &t }
