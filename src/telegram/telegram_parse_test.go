@@ -6,54 +6,14 @@ import (
 	"time"
 )
 
-// parseCreateArgs mirrors the parsing logic inside CreateGame so it can be
-// unit-tested without a live bot context.
-func parseCreateArgs(fullText string) (eventName string, location *string, startsAt *time.Time, allowGeneralJoin bool) {
-	// Strip the /create (or /create@bot_name) command prefix before processing args
-	text := strings.TrimSpace(fullText)
-	if idx := strings.Index(text, " "); idx != -1 {
-		text = strings.TrimSpace(text[idx+1:])
-	} else {
-		text = ""
-	}
-
-	// Remove location line from event name
-	eventName = locationRegex.ReplaceAllString(text, "")
-	// Remove datetime from event name
-	eventName = dateTimeRegex.ReplaceAllString(eventName, "")
-	// Remove general join symbol from event name
-	eventName = strings.ReplaceAll(eventName, "👥", "")
-	eventName = strings.TrimSpace(eventName)
-
-	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
-		var parsed time.Time
-		var parseErr error
-		for _, layout := range []string{"02-01-2006 15:04", "2006-01-02 15:04"} {
-			parsed, parseErr = time.ParseInLocation(layout, dateTimeStr, time.UTC)
-			if parseErr == nil {
-				break
-			}
-		}
-		if parseErr == nil {
-			startsAt = &parsed
-		}
-	}
-
-	if locationStr := locationRegex.FindStringSubmatch(fullText); len(locationStr) > 1 {
-		loc := strings.TrimSpace(locationStr[1])
-		location = &loc
-	}
-
-	allowGeneralJoin = strings.Contains(fullText, "👥")
-	return
-}
-
 func strPtr(s string) *string { return &s }
+func timePtr(t time.Time) *time.Time { return &t }
 
 func TestParseCreateArgs(t *testing.T) {
 	tests := []struct {
 		name            string
-		input           string
+		args            []string
+		fullText        string
 		wantName        string
 		wantLocation    *string
 		wantAllowJoin   bool
@@ -62,23 +22,26 @@ func TestParseCreateArgs(t *testing.T) {
 	}{
 		{
 			name:            "location on last line (no trailing newline)",
-			input:           "/create 👥 SPASSOLA\n📍grottaminchia",
+			args:            []string{"👥", "SPASSOLA"},
+			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   true,
 			wantStartsAtNil: true,
 		},
 		{
-			name:            "location on middle line (trailing newline present)",
-			input:           "/create 👥 SPASSOLA\n📍grottaminchia\nsome extra",
-			wantName:        "SPASSOLA\nsome extra",
+			name:            "location on middle line",
+			args:            []string{"👥", "SPASSOLA"},
+			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia\nsome extra",
+			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   true,
 			wantStartsAtNil: true,
 		},
 		{
 			name:            "no location",
-			input:           "/create 👥 SPASSOLA",
+			args:            []string{"👥", "SPASSOLA"},
+			fullText:        "/create 👥 SPASSOLA",
 			wantName:        "SPASSOLA",
 			wantLocation:    nil,
 			wantAllowJoin:   true,
@@ -86,15 +49,17 @@ func TestParseCreateArgs(t *testing.T) {
 		},
 		{
 			name:            "no general join flag",
-			input:           "/create SPASSOLA\n📍grottaminchia",
+			args:            []string{"SPASSOLA"},
+			fullText:        "/create SPASSOLA\n📍grottaminchia",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   false,
 			wantStartsAtNil: true,
 		},
 		{
-			name:            "ISO date format YYYY-MM-DD with location",
-			input:           "/create SPASSOLA 2025-06-01 20:00\n📍grottaminchia",
+			name:            "ISO date format YYYY-MM-DD",
+			args:            []string{"SPASSOLA", "2025-06-01", "20:00"},
+			fullText:        "/create SPASSOLA 2025-06-01 20:00\n📍grottaminchia",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   false,
@@ -102,8 +67,9 @@ func TestParseCreateArgs(t *testing.T) {
 			wantStartsAt:    timePtr(time.Date(2025, 6, 1, 20, 0, 0, 0, time.UTC)),
 		},
 		{
-			name:            "DD-MM-YYYY date format with @bot suffix — name must be empty",
-			input:           "/create@bg_night_bot 👥 01-04-2026 20:30",
+			name:            "DD-MM-YYYY date format with @bot suffix",
+			args:            []string{"👥", "01-04-2026", "20:30"},
+			fullText:        "/create@bg_night_bot 👥 01-04-2026 20:30",
 			wantName:        "",
 			wantLocation:    nil,
 			wantAllowJoin:   true,
@@ -112,7 +78,8 @@ func TestParseCreateArgs(t *testing.T) {
 		},
 		{
 			name:            "DD-MM-YYYY with name — name must not contain date or 👥",
-			input:           "/create@bg_night_bot 👥 SPASSOLA 01-04-2026 20:30",
+			args:            []string{"👥", "SPASSOLA", "01-04-2026", "20:30"},
+			fullText:        "/create@bg_night_bot 👥 SPASSOLA 01-04-2026 20:30",
 			wantName:        "SPASSOLA",
 			wantLocation:    nil,
 			wantAllowJoin:   true,
@@ -121,7 +88,8 @@ func TestParseCreateArgs(t *testing.T) {
 		},
 		{
 			name:            "ISO date on last line",
-			input:           "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30",
+			args:            []string{"👥", "SPASSOLA"},
+			fullText:        "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("grottaminchia"),
 			wantAllowJoin:   true,
@@ -130,7 +98,8 @@ func TestParseCreateArgs(t *testing.T) {
 		},
 		{
 			name:            "location with spaces",
-			input:           "/create SPASSOLA\n📍Via Roma 12, Milano",
+			args:            []string{"SPASSOLA"},
+			fullText:        "/create SPASSOLA\n📍Via Roma 12, Milano",
 			wantName:        "SPASSOLA",
 			wantLocation:    strPtr("Via Roma 12, Milano"),
 			wantAllowJoin:   false,
@@ -140,10 +109,10 @@ func TestParseCreateArgs(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotName, gotLocation, gotStartsAt, gotAllowJoin := parseCreateArgs(tc.input)
+			gotName, gotLocation, gotStartsAt, gotAllowJoin := parseCreateCommand(tc.args, tc.fullText, time.UTC)
 
 			if gotName != tc.wantName {
-				t.Errorf("eventName: got %q, want %q", gotName, tc.wantName)
+				t.Errorf("name: got %q, want %q", gotName, tc.wantName)
 			}
 
 			if tc.wantLocation == nil && gotLocation != nil {
@@ -171,4 +140,20 @@ func TestParseCreateArgs(t *testing.T) {
 	}
 }
 
-func timePtr(t time.Time) *time.Time { return &t }
+func TestParseCreateArgsNameDoesNotContainMetadata(t *testing.T) {
+	// Regression: event name was including the date/location/👥 markers
+	args := []string{"👥", "SPASSOLA\n📍grottaminchia\n2023-12-31", "20:30"}
+	fullText := "/create 👥 SPASSOLA\n📍grottaminchia\n2023-12-31 20:30"
+
+	name, _, _, _ := parseCreateCommand(args, fullText, time.UTC)
+
+	if strings.Contains(name, "📍") {
+		t.Errorf("name contains location marker: %q", name)
+	}
+	if strings.Contains(name, "👥") {
+		t.Errorf("name contains join marker: %q", name)
+	}
+	if strings.Contains(name, "2023") {
+		t.Errorf("name contains date: %q", name)
+	}
+}

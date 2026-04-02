@@ -25,6 +25,46 @@ import (
 var dateTimeRegex = regexp.MustCompile(`\d{2}-\d{2}-\d{4} \d{2}:\d{2}|\d{4}-\d{2}-\d{2} \d{2}:\d{2}`)
 var locationRegex = regexp.MustCompile(`📍([^\n]+?)(?:\n|$)`)
 
+// parseCreateCommand extracts the event name, location, start time, and
+// allowGeneralJoin flag from the raw /create command arguments and message text.
+// args is c.Args() (everything after the command token); fullText is c.Message().Text.
+// tz is used for datetime parsing and defaults to UTC when nil.
+func parseCreateCommand(args []string, fullText string, tz *time.Location) (name string, location *string, startsAt *time.Time, allowGeneralJoin bool) {
+	if tz == nil {
+		tz = time.UTC
+	}
+
+	raw := strings.Join(args, " ")
+	name = locationRegex.ReplaceAllString(raw, "")
+	name = dateTimeRegex.ReplaceAllString(name, "")
+	name = strings.ReplaceAll(name, "👥", "")
+	name = strings.TrimSpace(name)
+
+	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
+		var parsed time.Time
+		var parseErr error
+		for _, layout := range []string{"02-01-2006 15:04", "2006-01-02 15:04"} {
+			parsed, parseErr = time.ParseInLocation(layout, dateTimeStr, tz)
+			if parseErr == nil {
+				break
+			}
+		}
+		if parseErr == nil {
+			startsAt = &parsed
+		} else {
+			log.Default().Println("failed to parse date time:", parseErr)
+		}
+	}
+
+	if m := locationRegex.FindStringSubmatch(fullText); len(m) > 1 {
+		loc := strings.TrimSpace(m[1])
+		location = &loc
+	}
+
+	allowGeneralJoin = strings.Contains(fullText, "👥")
+	return
+}
+
 type Telegram struct {
 	Bot            *telebot.Bot
 	DB             *database.Database
@@ -166,13 +206,6 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 		markup.InlineKeyboard = append(markup.InlineKeyboard, []telebot.InlineButton{btn})
 		return c.Reply(usageT, markup)
 	}
-	// Build event name from args, then strip metadata markers so that
-	// "/create 👥 SPASSOLA 01-04-2026 20:30\n📍Rome" → "SPASSOLA"
-	eventName := strings.Join(args[0:], " ")
-	eventName = locationRegex.ReplaceAllString(eventName, "")
-	eventName = dateTimeRegex.ReplaceAllString(eventName, "")
-	eventName = strings.ReplaceAll(eventName, "👥", "")
-	eventName = strings.TrimSpace(eventName)
 	userID := c.Sender().ID
 	userName, _ := DefineUsername(c.Sender())
 	chatID := c.Chat().ID
@@ -180,46 +213,13 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	if c.Message().ThreadID != 0 {
 		threadID = utils.IntToPointer(c.Message().ThreadID)
 	}
-	var startsAt *time.Time
-	var location *string
 
 	fullText := c.Message().Text
 	log.Default().Println("Full text for parsing:", fullText)
-
-	// check regex for datetime: supports both DD-MM-YYYY HH:MM and YYYY-MM-DD HH:MM
-	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
-		tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
-		log.Default().Printf("Using location %s for chat %d", tzLocation.String(), chatID)
-
-		var parsed time.Time
-		var parseErr error
-		for _, layout := range []string{"02-01-2006 15:04", "2006-01-02 15:04"} {
-			parsed, parseErr = time.ParseInLocation(layout, dateTimeStr, tzLocation)
-			if parseErr == nil {
-				break
-			}
-		}
-		if parseErr != nil {
-			log.Default().Println("failed to parse date time:", parseErr)
-		} else {
-			log.Default().Printf("Parsed date time: %s\n", parsed.String())
-			startsAt = &parsed
-		}
-	}
-
-	// check regex for location
-	if locationStr := locationRegex.FindStringSubmatch(fullText); len(locationStr) > 1 {
-		loc := strings.TrimSpace(locationStr[1])
-		log.Default().Printf("Parsed location: %s\n", loc)
-		location = &loc
-	}
+	tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
+	eventName, location, startsAt, allowGeneralJoin := parseCreateCommand(args, fullText, tzLocation)
 
 	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
-
-	allowGeneralJoin := false
-	if strings.Contains(fullText, "👥") {
-		allowGeneralJoin = true
-	}
 
 	var event *models.Event
 	if event, err = t.Service.CreateEvent(chatID, threadID, nil, userID, userName, eventName, location, startsAt, allowGeneralJoin); err != nil {
