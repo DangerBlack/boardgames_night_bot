@@ -51,14 +51,14 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 
 	if eventID, err = s.DB.InsertEventWithOptionalGame(id, chatID, userID, userName, name, location, startsAt, allowGeneralJoin); err != nil {
 		log.Default().Println("failed to create event:", err)
-		return nil, errors.New("failed to create event")
+		return nil, fmt.Errorf("failed to create event: %w", err)
 	}
 	log.Default().Printf("Event created with id: %s", eventID)
 	var event *models.Event
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
-		return nil, errors.New("invalid event ID")
+		return nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	body, markup := event.FormatMsg(s.Localizer(&chatID), s.Url)
@@ -79,12 +79,12 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 	responseMsg, err := s.Bot.Send(to, body, opts, markup, telebot.NoPreview)
 	if err != nil {
 		log.Default().Println("failed to create event:", err)
-		return nil, errors.New("failed to create event")
+		return nil, fmt.Errorf("failed to create event: %w", err)
 	}
 
 	if err = s.DB.UpdateEventMessageID(eventID, int64(responseMsg.ID)); err != nil {
 		log.Default().Println("failed to create event:", err)
-		return nil, errors.New("failed to create event")
+		return nil, fmt.Errorf("failed to create event: %w", err)
 	}
 
 	event.MessageID = utils.IntToPointer(responseMsg.ID)
@@ -98,7 +98,7 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load event:", err)
-		return errors.New("invalid event ID")
+		return fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	if event.Locked && (userID == nil || event.UserID != *userID) {
@@ -108,7 +108,7 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 
 	if err = s.DB.DeleteEvent(eventID); err != nil {
 		log.Default().Println("failed to delete event:", err)
-		return errors.New("failed to delete event")
+		return fmt.Errorf("failed to delete event: %w", err)
 	}
 
 	to := &telebot.Chat{
@@ -168,7 +168,7 @@ func (s *Service) CreateGame(
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
-		return nil, nil, errors.New("invalid event ID")
+		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	if event.Locked && event.UserID != userID {
@@ -261,7 +261,7 @@ func (s *Service) CreateGame(
 
 	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, *finalMaxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
 		log.Default().Println("failed to insert board game:", err)
-		return nil, nil, errors.New("failed to insert board game")
+		return nil, nil, fmt.Errorf("failed to insert board game: %w", err)
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
@@ -298,7 +298,7 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
-		return nil, nil, errors.New("invalid event ID")
+		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	if event.Locked && event.UserID != userID {
@@ -356,7 +356,7 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 
 	if err = s.DB.UpdateBoardGameBGGInfoByID(gameID, maxPlayers, bgID, bgName, bgUrl, bgImageUrl); err != nil {
 		log.Default().Println("failed to update board game:", err)
-		return nil, nil, errors.New("failed to update board game")
+		return nil, nil, fmt.Errorf("failed to update board game: %w", err)
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
@@ -380,7 +380,7 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
-		return nil, nil, errors.New("invalid event ID")
+		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	if event.Locked && event.UserID != userID {
@@ -397,7 +397,7 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 
 	if err = s.DB.DeleteBoardGameByID(gameUUID); err != nil {
 		log.Default().Println("failed to delete board game:", err)
-		return nil, nil, errors.New("failed to delete board game")
+		return nil, nil, fmt.Errorf("failed to delete board game: %w", err)
 	}
 
 	to := &telebot.Chat{
@@ -440,7 +440,7 @@ func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int
 	var participantID string
 	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username, isTelegramUsername); err != nil {
 		log.Default().Println("failed to add user to participants table:", err)
-		return "", nil, nil, errors.New("invalid form data")
+		return "", nil, nil, fmt.Errorf("invalid form data: %w", err)
 	}
 
 	if _, err = s.updateTelegram(eventID); err != nil {
@@ -451,7 +451,7 @@ func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int
 	var event *models.Event
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
-		return "", nil, nil, errors.New("invalid event ID")
+		return "", nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
 	game := utils.PickGame(event, gameID)
@@ -471,7 +471,7 @@ func (s *Service) DeletePlayer(eventID string, userID int64) (string, *models.Ev
 			return "", nil, nil, database.ErrNoRows
 		}
 
-		return "", nil, nil, errors.New("failed to remove participant")
+		return "", nil, nil, fmt.Errorf("failed to remove participant: %w", err)
 	}
 
 	if event, err = s.updateTelegram(eventID); err != nil {
