@@ -70,6 +70,38 @@ func (d *Database) MigrateToV7() {
 	log.Default().Println("database migration to v7 completed")
 }
 
+// MigrateToV8 removes rows orphaned while foreign keys were not enforced
+// (games and participants of deleted events, participants of deleted games).
+// It runs before anything relies on cascades and is idempotent.
+func (d *Database) MigrateToV8() {
+	queries := []string{
+		`DELETE FROM participants WHERE event_id NOT IN (SELECT id FROM events)
+			OR boardgame_id NOT IN (SELECT id FROM boardgames);`,
+		`DELETE FROM boardgames WHERE event_id NOT IN (SELECT id FROM events);`,
+		`DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users);`,
+		`DELETE FROM auth_tokens WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users);`,
+	}
+	var removed int64
+	for _, q := range queries {
+		res, err := d.db.Exec(q)
+		if err != nil {
+			log.Fatal("MigrateToV8: ", err)
+		}
+		n, _ := res.RowsAffected()
+		removed += n
+	}
+
+	var violations int
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM pragma_foreign_key_check`).Scan(&violations); err != nil {
+		log.Fatal("MigrateToV8: foreign key check: ", err)
+	}
+	if violations > 0 {
+		log.Default().Printf("warning: %d foreign key violations remain after cleanup", violations)
+	}
+
+	log.Default().Printf("database migration to v8 completed (%d orphan rows removed)", removed)
+}
+
 func (d *Database) SetEventAllowExternal(eventID string, allow bool) error {
 	res, err := d.db.Exec(`UPDATE events SET allow_external = @allow WHERE id = @id;`,
 		NamedArgs(map[string]any{"allow": allow, "id": eventID})...)

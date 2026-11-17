@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bluele/gcache"
 	"github.com/google/uuid"
 
 	"github.com/anujdecoder/ics"
@@ -48,6 +49,8 @@ type Controller struct {
 	BotUsername    string
 	BaseURL        string
 	SecureCookies  bool
+	// SeenWebhookSignatures blocks replays of signed webhook requests.
+	SeenWebhookSignatures gcache.Cache
 	// PrivacyContact is shown on the privacy page (PRIVACY_CONTACT env).
 	PrivacyContact string
 }
@@ -75,6 +78,8 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGSe
 		BotUsername:   botUsername,
 		BaseURL:       baseURL,
 		SecureCookies: strings.HasPrefix(baseURL, "https://"),
+		SeenWebhookSignatures: gcache.New(100_000).LRU().
+			Expiration(webhookMaxAge + webhookMaxSkew + time.Minute).Build(),
 	}
 }
 
@@ -257,6 +262,12 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 	if err = ctx.ShouldBind(&newEvent); err != nil {
 		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form data")
+		return
+	}
+
+	if !c.Service.IsChatMember(newEvent.ChatID, p.UserID) {
+		log.Default().Printf("user %d tried to create an event in chat %d without being a member", p.UserID, newEvent.ChatID)
+		c.renderError(ctx, nil, nil, "You are not a member of this chat")
 		return
 	}
 
@@ -818,6 +829,14 @@ func P(x string) *string {
 	return &x
 }
 
+const (
+	// webhookMaxAge is how long a signed webhook request stays valid.
+	webhookMaxAge = 2 * time.Minute
+	// webhookMaxSkew tolerates clocks slightly ahead of ours; anything dated
+	// further in the future is rejected (it would outlive the replay cache).
+	webhookMaxSkew = 30 * time.Second
+)
+
 func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		webhookID := ctx.Param("webhook_id")
@@ -842,7 +861,7 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
-		log.Default().Printf("Verifying webhook %s at %s, secret [%s] with body: %d length", webhookID, date, webhook.Secret[0:3], len(body))
+		log.Default().Printf("Verifying webhook %s at %s with body: %d length", webhookID, date, len(body))
 
 		contentHash := sha256.Sum256(body)
 		contentHashHex := hex.EncodeToString(contentHash[:])
@@ -876,10 +895,19 @@ func (c *Controller) VerifyWebhook() gin.HandlerFunc {
 			return
 		}
 
-		if time.Since(reqTime) > 2*time.Minute {
+		if age := time.Since(reqTime); age > webhookMaxAge || age < -webhookMaxSkew {
 			ctx.AbortWithStatusJSON(401, gin.H{"error": "request too old"})
 			return
 		}
+
+		// A valid signed request can be captured and replayed while it is
+		// still fresh: remember signatures for longer than the validity window.
+		replayKey := webhookID + ":" + clientSig
+		if _, err := c.SeenWebhookSignatures.Get(replayKey); err == nil {
+			ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "replayed request"})
+			return
+		}
+		_ = c.SeenWebhookSignatures.Set(replayKey, struct{}{})
 
 		ctx.Set("chat_id", webhook.ChatID)
 		ctx.Set("thread_id", webhook.ThreadID)
@@ -944,6 +972,12 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		var payload *models.HookNewEventPayload
 		if payload, err = Cast[models.HookNewEventPayload](webhookEnvelope.Data); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook data"})
+			return
+		}
+
+		// Event pages and FK lookups assume UUID ids; reject anything else.
+		if !models.IsValidUUID(payload.ID) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
 			return
 		}
 

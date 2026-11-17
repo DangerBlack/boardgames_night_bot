@@ -1106,3 +1106,28 @@ func TestDeletePlayer(t *testing.T) {
 		t.Fatalf("Expected Telegram message to be updated")
 	}
 }
+
+func TestIsChatMember(t *testing.T) {
+	service := BeforeEach()
+	tg := service.Bot.(*mocks.MockTelegramService)
+	cases := []struct {
+		member *telebot.ChatMember
+		err    error
+		want   bool
+	}{
+		{&telebot.ChatMember{Role: telebot.Member}, nil, true},
+		{&telebot.ChatMember{Role: telebot.Administrator}, nil, true},
+		{&telebot.ChatMember{Role: telebot.Creator}, nil, true},
+		{&telebot.ChatMember{Role: telebot.Restricted, Member: true}, nil, true},
+		{&telebot.ChatMember{Role: telebot.Restricted, Member: false}, nil, false},
+		{&telebot.ChatMember{Role: telebot.Left}, nil, false},
+		{&telebot.ChatMember{Role: telebot.Kicked}, nil, false},
+		{nil, fmt.Errorf("Bad Request: chat not found"), false},
+	}
+	for _, c := range cases {
+		tg.ChatMemberOfFunc = func(chat, user telebot.Recipient) (*telebot.ChatMember, error) { return c.member, c.err }
+		if got := service.IsChatMember(1, 2); got != c.want {
+			t.Errorf("member=%+v err=%v: got %v want %v", c.member, c.err, got, c.want)
+		}
+	}
+}

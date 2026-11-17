@@ -44,6 +44,8 @@ To install the Boardgame Night Bot, follow these steps:
     TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12
     # Shown on the /privacy page
     PRIVACY_CONTACT=privacy@yourdomain.example
+    # Let webhooks target private/loopback addresses (local testing only)
+    ALLOW_LOCAL_WEBHOOKS=false
     ```
 
 > [!Note]
@@ -91,6 +93,10 @@ ngrok http 8080
 docker build -t boardgames-night-bot .
 docker run --env-file .env -p 8080:8080 -v ./archive:/archive boardgames-night-bot
 ```
+
+The container starts as root only to `chown` the data directory (`DB_PATH`, default `/archive`), then runs the bot as the unprivileged user `bot` (uid 10001). Existing volumes are fixed automatically on the first start. On the host, `./archive` will then be owned by uid 10001.
+
+The SQLite database runs in WAL mode, so back up `bot_data.sqlite` together with its `-wal`/`-shm` files, or use `sqlite3 bot_data.sqlite ".backup out.sqlite"`.
 
 ## Docker push
 ```

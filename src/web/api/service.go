@@ -129,6 +129,25 @@ func (s *Service) SetAllowExternal(eventID string, userID int64, allow bool) (*m
 	return event, nil
 }
 
+// IsChatMember reports whether a Telegram user belongs to a chat. The web
+// "create event" form receives the chat ID from the mini-app start parameter,
+// which anyone can forge; without this check any user could make the bot post
+// into any group it is in.
+func (s *Service) IsChatMember(chatID, userID int64) bool {
+	member, err := s.Bot.ChatMemberOf(&telebot.Chat{ID: chatID}, &telebot.User{ID: userID})
+	if err != nil || member == nil {
+		log.Default().Printf("chat membership check failed for user %d in chat %d: %v", userID, chatID, err)
+		return false
+	}
+	switch member.Role {
+	case telebot.Creator, telebot.Administrator, telebot.Member:
+		return true
+	case telebot.Restricted:
+		return member.Member
+	}
+	return false
+}
+
 // RefreshEvents re-renders the Telegram messages of the given events, e.g.
 // after an account merge renamed participants.
 func (s *Service) RefreshEvents(eventIDs []string) {
