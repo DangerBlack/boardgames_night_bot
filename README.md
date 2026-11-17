@@ -34,6 +34,11 @@ To install the Boardgame Night Bot, follow these steps:
     HTTP_MAX_ATTEMPT=3
     FAILURE_EXPIRATION=10m
     MAX_FAILURE_ATTEMPTS=5
+    # Email registration (optional: without these, email sign-in is disabled)
+    RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+    EMAIL_FROM="Board Game Night <noreply@yourdomain.example>"
+    # How long Telegram Mini App init data stays valid (default 24h)
+    TELEGRAM_INIT_DATA_MAX_AGE=24h
     ```
 
 > [!Note]
@@ -45,6 +50,18 @@ To install the Boardgame Night Bot, follow these steps:
 > _Now please choose a short name for your web app: 3-30 characters, `a-zA-Z0-9_`_
 >
 > chose `home`
+
+## Web accounts and sharing
+
+People can take part in events from the web, not only from Telegram:
+
+- **Identity is verified server-side.** Inside the Telegram mini-app the page sends Telegram's signed `initData`, which the server checks with the bot `TOKEN`. Outside Telegram, visitors sign in with a one-time email link (sent through [Resend](https://resend.com)).
+- **After the first sign-in by email**, the user chooses:
+  - **Link Telegram** (claim): the bot deep link `/start link_<token>` proves which Telegram account is theirs. From then on they act as that Telegram user everywhere.
+  - **Separate account**: they choose a username and are marked as separate from Telegram. They are shown with ✉️, and they can still link Telegram later. When they do, their participations move to the Telegram account.
+- **Sharing**: every event page has a share link (`BASE_URL/events/<id>`). By default only Telegram users can join. The event owner can tick *"Let people without Telegram join"*, either when creating the event or on the event page. A 🔗 share button then also appears in the Telegram message.
+
+Your Resend sending domain must be verified so that `EMAIL_FROM` is accepted.
 
 ## Usage
 
