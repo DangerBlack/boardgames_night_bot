@@ -263,3 +263,24 @@ func TestForeignKeysCascadeAndOrphanCleanup(t *testing.T) {
 		t.Fatalf("orphans not purged: %d games, %d participants", games, parts)
 	}
 }
+
+// Guards the production upgrade: V8 must only remove orphans. The event_id
+// columns are declared INTEGER but hold text UUIDs, so a type mismatch in the
+// NOT IN comparison would wipe every game and participant.
+func TestMigrateToV8KeepsValidRows(t *testing.T) {
+	d := newMigratedDB(t)
+	id, _ := d.InsertEventWithOptionalGame(nil, 1, 1, "a", "x", nil, nil, true)
+	var gid int64
+	if err := d.db.QueryRow(`SELECT id FROM boardgames WHERE event_id = ?`, id).Scan(&gid); err != nil {
+		t.Fatal(err)
+	}
+	d.InsertParticipant(nil, id, gid, 5, "p", false)
+	d.MigrateToV7()
+	d.MigrateToV8()
+	var g, p int
+	d.db.QueryRow(`SELECT COUNT(*) FROM boardgames`).Scan(&g)
+	d.db.QueryRow(`SELECT COUNT(*) FROM participants`).Scan(&p)
+	if g != 1 || p != 1 {
+		t.Fatalf("V8 removed valid rows: games=%d participants=%d", g, p)
+	}
+}

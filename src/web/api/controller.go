@@ -975,6 +975,12 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 			return
 		}
 
+		// Event pages and FK lookups assume UUID ids; reject anything else.
+		if !models.IsValidUUID(payload.ID) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+			return
+		}
+
 		if payload.ChatID == 0 {
 			log.Default().Printf("Setting missing ChatID in webhook payload to %d", chatID)
 			payload.ChatID = chatID
