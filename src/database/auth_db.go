@@ -123,6 +123,30 @@ func (d *Database) ConsumeAuthToken(tokenHash, purpose string) (email *string, u
 	return email, userID, nil
 }
 
+// PeekAuthToken returns what a token was issued for without consuming it,
+// or ErrInvalidOrExpiredToken if it is unknown, used, or expired.
+func (d *Database) PeekAuthToken(tokenHash, purpose string) (email *string, userID *int64, err error) {
+	var e sql.NullString
+	var u sql.NullInt64
+	err = d.db.QueryRow(`SELECT email, user_id FROM auth_tokens
+		WHERE token_hash = @hash AND purpose = @purpose AND used_at IS NULL AND expires_at > @now;`,
+		NamedArgs(map[string]any{"hash": tokenHash, "purpose": purpose, "now": time.Now().Unix()})...,
+	).Scan(&e, &u)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, ErrInvalidOrExpiredToken
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if e.Valid {
+		email = &e.String
+	}
+	if u.Valid {
+		userID = &u.Int64
+	}
+	return email, userID, nil
+}
+
 // CountRecentAuthTokens counts tokens issued for an email since a given time,
 // used to throttle outgoing emails per address.
 func (d *Database) CountRecentAuthTokens(email, purpose string, since time.Time) (int, error) {

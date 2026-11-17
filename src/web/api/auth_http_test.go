@@ -295,11 +295,29 @@ func TestLinkTelegramViaBotPayload(t *testing.T) {
 	if len(payload) > 64 {
 		t.Fatalf("start payload too long for Telegram: %d", len(payload))
 	}
-	if _, err = e.auth.LinkWithStartPayload(payload, auth.TelegramUser{ID: 9999, FirstName: "Clara"}); err != nil {
+	// /start only inspects: it must not link anything by itself.
+	pending, err := e.auth.InspectStartPayload(payload)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = e.auth.LinkWithStartPayload(payload, auth.TelegramUser{ID: 1234}); err == nil {
+	if pending.Email != "claim@example.com" {
+		t.Fatalf("prompt must show the requesting email, got %q", pending.Email)
+	}
+	if again, _ := e.db.GetUserByID(user.ID); again.TelegramUserID != nil {
+		t.Fatal("account linked without confirmation")
+	}
+	if _, err = e.auth.InspectStartPayload(payload); err != nil {
+		t.Fatal("inspection consumed the token")
+	}
+
+	if _, err = e.auth.ConfirmLink(pending.Token, auth.TelegramUser{ID: 9999, FirstName: "Clara"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = e.auth.ConfirmLink(pending.Token, auth.TelegramUser{ID: 1234}); err == nil {
 		t.Fatal("link token reused")
+	}
+	if _, err = e.auth.InspectStartPayload(payload); err == nil {
+		t.Fatal("used token still inspectable")
 	}
 
 	p := e.participants(t)
@@ -360,5 +378,50 @@ func TestDeleteSeparatedAccountRemovesParticipations(t *testing.T) {
 	}
 	if _, err := e.auth.SessionUser(session); err == nil {
 		t.Fatal("session survived account deletion")
+	}
+}
+
+// Every message ID the bot and the web pages localize must exist in every
+// language: MustLocalize panics at runtime on a missing key.
+func TestAllAuthMessagesTranslated(t *testing.T) {
+	bundle := i18n.NewBundle(language.English)
+	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
+	ids := append([]string{}, webMessageIDs...)
+	ids = append(ids, "EmailLoginSubject", "EmailLoginBody", "EmailLoginButton",
+		"LinkSuccess", "LinkFailed", "LinkTelegramTaken", "LinkPrivateOnly", "LinkOpenAccount",
+		"LinkConfirmQuestion", "LinkConfirmButton", "LinkCancelButton", "LinkCancelled", "ShareEvent")
+	for _, lang := range []string{"en", "it", "de"} {
+		mf, err := bundle.LoadMessageFile(fmt.Sprintf("../../../localization/active.%s.toml", lang))
+		if err != nil {
+			t.Fatal(err)
+		}
+		have := map[string]bool{}
+		for _, m := range mf.Messages {
+			have[m.ID] = true
+		}
+		for _, id := range ids {
+			if !have[id] {
+				t.Errorf("%s: missing message %s", lang, id)
+			}
+		}
+	}
+}
+
+func TestVerifyPageShowsTargetEmail(t *testing.T) {
+	e := newHTTPEnv(t)
+	email := "attacker@example.com"
+	if err := e.db.CreateAuthToken(auth.HashToken("tok"), auth.PurposeLogin, &email, nil, time.Now().Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	w := e.do("GET", "/auth/verify?token=tok", nil)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), email) {
+		t.Fatalf("verify page must name the account: %d", w.Code)
+	}
+	// Showing the page must not consume the token.
+	if _, err := e.auth.LoginTokenEmail("tok"); err != nil {
+		t.Fatal("GET consumed the login token")
+	}
+	if w := e.do("GET", "/auth/verify?token=nope", nil); w.Code != http.StatusBadRequest {
+		t.Fatalf("unknown token: %d", w.Code)
 	}
 }

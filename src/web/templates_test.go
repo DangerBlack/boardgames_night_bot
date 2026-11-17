@@ -37,7 +37,7 @@ func TestTemplatesRender(t *testing.T) {
 		{"game_info", map[string]any{"Id": "e1", "Game": games[0]}, []string{"Web Person ✉️", "tg-init-data"}},
 		{"new_event", map[string]any{"ChatID": "1", "AllowExternal": "allow"}, []string{`name="allow_external"`, "tgInitData"}},
 		{"login", map[string]any{"Next": "/events/e1", "EmailEnabled": true, "T": T}, []string{`value="/events/e1"`}},
-		{"verify", map[string]any{"Token": "abc", "Next": "/account", "T": T}, []string{`value="abc"`}},
+		{"verify", map[string]any{"Token": "abc", "Email": "victim@example.com", "Next": "/account", "T": T}, []string{`value="abc"`, "victim@example.com"}},
 		{"message", map[string]any{"Title": "t", "Body": "b", "Next": "/login", "T": T}, []string{"/login"}},
 		{"account", map[string]any{"State": "pending", "Email": &email, "Next": "/account", "T": T}, []string{"/account/username", "/account/link-telegram"}},
 		{"account", map[string]any{"State": "separated", "Username": &user, "Email": &email, "Next": "/events/e1", "T": T}, []string{"Bob", "/account/link-telegram"}},

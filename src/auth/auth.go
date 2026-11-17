@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -41,6 +42,7 @@ var (
 type Store interface {
 	CreateAuthToken(tokenHash, purpose string, email *string, userID *int64, expiresAt time.Time) error
 	ConsumeAuthToken(tokenHash, purpose string) (email *string, userID *int64, err error)
+	PeekAuthToken(tokenHash, purpose string) (email *string, userID *int64, err error)
 	CountRecentAuthTokens(email, purpose string, since time.Time) (int, error)
 	GetOrCreateUserByEmail(email string) (*models.User, error)
 	GetUserByID(id int64) (*models.User, error)
@@ -138,9 +140,23 @@ func NormalizeUsername(username string) (string, error) {
 }
 
 // SafeNext only allows local absolute paths as post-login redirects.
+//
+// Browsers drop tabs/newlines from URLs and treat "\\" like "/", so
+// "/\t/evil.com" or "/\\evil.com" would become "//evil.com": any control
+// character or backslash is rejected outright.
 func SafeNext(next string) string {
-	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, "/\\") {
-		return "/account"
+	const fallback = "/account"
+	if next == "" || len(next) > 2048 || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+		return fallback
+	}
+	for _, r := range next {
+		if r < 0x20 || r == 0x7f || r == '\\' {
+			return fallback
+		}
+	}
+	u, err := url.Parse(next)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil {
+		return fallback
 	}
 	return next
 }
@@ -232,6 +248,19 @@ func (s *Service) Logout(rawSession string) error {
 	return s.Store.DeleteSession(HashToken(rawSession))
 }
 
+// LoginTokenEmail returns the email a login link was issued for, without
+// consuming it, so the confirmation page can show who will be signed in.
+func (s *Service) LoginTokenEmail(rawToken string) (string, error) {
+	email, _, err := s.Store.PeekAuthToken(HashToken(rawToken), PurposeLogin)
+	if err != nil {
+		return "", err
+	}
+	if email == nil {
+		return "", database.ErrInvalidOrExpiredToken
+	}
+	return *email, nil
+}
+
 // ---- separated accounts ----
 
 func (s *Service) ChooseSeparatedUsername(user *models.User, rawUsername string) error {
@@ -275,14 +304,49 @@ func (s *Service) CreateTelegramLinkToken(user *models.User) (string, error) {
 	return LinkStartPrefix + raw, nil
 }
 
-// LinkWithStartPayload is called by the bot when it receives /start link_<token>.
-// The Telegram identity comes from the update sender, which Telegram vouches for.
-func (s *Service) LinkWithStartPayload(payload string, tg TelegramUser) (*models.User, error) {
+// PendingLink describes a link request shown to the Telegram user for confirmation.
+type PendingLink struct {
+	Token string // raw token, without the "link_" prefix
+	Email string // email of the web account asking to be linked
+}
+
+// InspectStartPayload validates /start link_<token> WITHOUT consuming it.
+//
+// Linking must never happen on /start alone: anyone can create a token for
+// their own email and send the t.me link to a victim, and a single tap on
+// Start would hand the victim's Telegram identity to the attacker's web
+// account. The bot shows which email is asking and links only on an explicit
+// confirmation (ConfirmLink).
+func (s *Service) InspectStartPayload(payload string) (*PendingLink, error) {
 	raw, ok := strings.CutPrefix(payload, LinkStartPrefix)
 	if !ok || raw == "" {
 		return nil, database.ErrInvalidOrExpiredToken
 	}
-	_, userID, err := s.Store.ConsumeAuthToken(HashToken(raw), PurposeLinkTelegram)
+	_, userID, err := s.Store.PeekAuthToken(HashToken(raw), PurposeLinkTelegram)
+	if err != nil {
+		return nil, err
+	}
+	if userID == nil {
+		return nil, database.ErrInvalidOrExpiredToken
+	}
+	user, err := s.Store.GetUserByID(*userID)
+	if err != nil {
+		return nil, err
+	}
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+	return &PendingLink{Token: raw, Email: email}, nil
+}
+
+// ConfirmLink consumes the token and links the account to the confirming
+// Telegram user (the callback sender, vouched for by Telegram).
+func (s *Service) ConfirmLink(rawToken string, tg TelegramUser) (*models.User, error) {
+	if rawToken == "" {
+		return nil, database.ErrInvalidOrExpiredToken
+	}
+	_, userID, err := s.Store.ConsumeAuthToken(HashToken(rawToken), PurposeLinkTelegram)
 	if err != nil {
 		return nil, err
 	}

@@ -140,6 +140,9 @@ const (
 	AddPlayer  EventAction = "$add_player"
 	Cancel     EventAction = "$cancel"
 	Unregister EventAction = "$unregister"
+	// LinkConfirm / LinkCancel answer the "link this Telegram account to <email>?" prompt.
+	LinkConfirm EventAction = "$link_ok"
+	LinkCancel  EventAction = "$link_no"
 )
 
 type WebUrl struct {
