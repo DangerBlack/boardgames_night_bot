@@ -1,6 +1,7 @@
 package main
 
 import (
+	"boardgame-night-bot/src/auth"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
 	langpack "boardgame-night-bot/src/language"
@@ -165,6 +166,7 @@ func main() {
 	db.MigrateToV4()
 	db.MigrateToV5()
 	db.MigrateToV6()
+	db.MigrateToV7()
 
 	bot, err := telebot.NewBot(telebot.Settings{
 		Token:     botToken,
@@ -195,6 +197,39 @@ func main() {
 		BaseUrl:       baseUrl,
 	})
 
+	// Email registration is optional: without Resend credentials the web app
+	// keeps working for Telegram users and email sign-in is reported as unavailable.
+	var mailer auth.Mailer
+	resendAPIKey := os.Getenv("RESEND_API_KEY")
+	emailFrom := os.Getenv("EMAIL_FROM")
+	if resendAPIKey != "" && emailFrom != "" {
+		mailer = auth.NewResendMailer(resendAPIKey, emailFrom)
+		log.Default().Println("email registration enabled (resend)")
+	} else {
+		log.Default().Println("RESEND_API_KEY / EMAIL_FROM not set: email registration disabled")
+	}
+
+	authConfig := auth.DefaultConfig(botToken)
+	if v := os.Getenv("TELEGRAM_INIT_DATA_MAX_AGE"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			log.Fatal("TELEGRAM_INIT_DATA_MAX_AGE is not a valid duration")
+		}
+		authConfig.InitDataMaxAge = d
+	}
+	authService := auth.NewService(db, mailer, authConfig)
+	authService.OnEventsChanged = service.RefreshEvents
+
+	purgeAuth := cron.New()
+	if _, err = purgeAuth.AddFunc("@hourly", func() {
+		if err := db.PurgeExpiredAuthData(); err != nil {
+			log.Default().Println("failed to purge expired auth data:", err)
+		}
+	}); err != nil {
+		log.Fatal(err)
+	}
+	purgeAuth.Start()
+
 	telegram := telegram.Telegram{
 		Bot:            bot,
 		DB:             db,
@@ -206,6 +241,7 @@ func main() {
 		},
 		Hook:    wh,
 		Service: service,
+		Auth:    authService,
 	}
 
 	log.Default().Println("bot started")
@@ -214,7 +250,7 @@ func main() {
 
 	go func() {
 		log.Default().Println("server started")
-		web.StartServer(port, db, bggService, bot, bundle, wh, service)
+		web.StartServer(port, db, bggService, bot, bundle, wh, service, authService, baseUrl)
 		log.Default().Println("server stopped")
 	}()
 	go func() {

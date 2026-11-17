@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"boardgame-night-bot/src/auth"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
 	"boardgame-night-bot/src/language"
@@ -73,6 +74,7 @@ type Telegram struct {
 	Url            models.WebUrl
 	Hook           *hooks.WebhookClient
 	Service        *api.Service
+	Auth           *auth.Service
 }
 
 func (t Telegram) SetupHandlers() {
@@ -150,6 +152,10 @@ func (t Telegram) Start(c telebot.Context) error {
 		return c.Send(welcomeT, opts)
 	}
 
+	if strings.HasPrefix(args[0], auth.LinkStartPrefix) {
+		return t.LinkAccount(c, args[0], opts)
+	}
+
 	eventID := args[0]
 	var event *models.Event
 	if event, err = t.DB.SelectEventByEventID(eventID); err != nil {
@@ -178,6 +184,43 @@ func (t Telegram) Start(c telebot.Context) error {
 		},
 	})
 	return c.Send(openT, markup, opts)
+}
+
+// LinkAccount handles /start link_<token>: the web account that issued the
+// token is linked to the Telegram user who sent the command. Telegram vouches
+// for the sender, so this proves ownership of the Telegram account.
+func (t Telegram) LinkAccount(c telebot.Context, payload string, opts *telebot.SendOptions) error {
+	localizer := t.Localizer(c)
+	if c.Chat().Type != telebot.ChatPrivate {
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkPrivateOnly"}), opts)
+	}
+	if t.Auth == nil {
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}), opts)
+	}
+
+	sender := c.Sender()
+	_, err := t.Auth.LinkWithStartPayload(payload, auth.TelegramUser{
+		ID:        sender.ID,
+		FirstName: sender.FirstName,
+		LastName:  sender.LastName,
+		Username:  sender.Username,
+	})
+	switch {
+	case err == nil:
+		markup := &telebot.ReplyMarkup{}
+		markup.InlineKeyboard = [][]telebot.InlineButton{{{
+			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkOpenAccount"}),
+			URL:  strings.TrimRight(t.Url.BaseUrl, "/") + "/account",
+		}}}
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkSuccess"}), markup, opts)
+	case errors.Is(err, database.ErrTelegramAlreadyLinked):
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkTelegramTaken"}), opts)
+	default:
+		if !errors.Is(err, database.ErrInvalidOrExpiredToken) {
+			log.Default().Println("failed to link account:", err)
+		}
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}), opts)
+	}
 }
 
 func (t Telegram) CreateGame(c telebot.Context) error {

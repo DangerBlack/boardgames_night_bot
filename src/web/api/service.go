@@ -92,6 +92,50 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 	return event, nil
 }
 
+// ErrExternalNotAllowed is returned when a web-only account tries to act on an
+// event whose owner has not opened it to people outside Telegram.
+var ErrExternalNotAllowed = errors.New("this event is not open to people outside Telegram")
+
+// ErrNotEventOwner is returned when someone other than the owner changes event settings.
+var ErrNotEventOwner = errors.New("only the event owner can change this setting")
+
+func checkExternalAccess(event *models.Event, userID int64) error {
+	if models.IsExternalUserID(userID) && !event.AllowExternal {
+		return ErrExternalNotAllowed
+	}
+	return nil
+}
+
+// SetAllowExternal opens or closes the event to web-only (email) accounts.
+// Only the event owner may change it.
+func (s *Service) SetAllowExternal(eventID string, userID int64, allow bool) (*models.Event, error) {
+	event, err := s.DB.SelectEventByEventID(eventID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid event ID: %w", err)
+	}
+	if event.UserID != userID {
+		return event, ErrNotEventOwner
+	}
+	if err = s.DB.SetEventAllowExternal(eventID, allow); err != nil {
+		return event, fmt.Errorf("failed to update event: %w", err)
+	}
+	if updated, err := s.updateTelegram(eventID); err == nil && updated != nil {
+		return updated, nil
+	}
+	event.AllowExternal = allow
+	return event, nil
+}
+
+// RefreshEvents re-renders the Telegram messages of the given events, e.g.
+// after an account merge renamed participants.
+func (s *Service) RefreshEvents(eventIDs []string) {
+	for _, id := range eventIDs {
+		if _, err := s.updateTelegram(id); err != nil {
+			log.Default().Printf("failed to refresh event %s: %v", id, err)
+		}
+	}
+}
+
 func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) error {
 	var err error
 	var event *models.Event
@@ -169,6 +213,10 @@ func (s *Service) CreateGame(
 	if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
 		log.Default().Println("failed to load game:", err)
 		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
+	}
+
+	if err = checkExternalAccess(event, userID); err != nil {
+		return event, nil, err
 	}
 
 	if event.Locked && event.UserID != userID {
@@ -303,6 +351,10 @@ func (s *Service) UpdateGame(eventID string, gameID int64, userID int64, bg mode
 		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
+	if err = checkExternalAccess(event, userID); err != nil {
+		return event, nil, err
+	}
+
 	if event.Locked && event.UserID != userID {
 		log.Default().Println("event is locked")
 		return nil, nil, errors.New("unable to add game to locked event")
@@ -385,6 +437,10 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 		return nil, nil, fmt.Errorf("invalid event ID: %w", err)
 	}
 
+	if err = checkExternalAccess(event, userID); err != nil {
+		return event, nil, err
+	}
+
 	if event.Locked && event.UserID != userID {
 		log.Default().Println("event is locked")
 		return nil, nil, errors.New("unable to delete game from locked event")
@@ -440,6 +496,19 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int64, username string, isTelegramUsername bool) (string, *models.Event, *models.BoardGame, error) {
 	var err error
 	var participantID string
+
+	if models.IsExternalUserID(userID) {
+		var event *models.Event
+		if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
+			return "", nil, nil, fmt.Errorf("invalid event ID: %w", err)
+		}
+		if err = checkExternalAccess(event, userID); err != nil {
+			return "", event, nil, err
+		}
+		// web-only names are never Telegram handles
+		isTelegramUsername = false
+	}
+
 	if participantID, err = s.DB.InsertParticipant(id, eventID, gameID, userID, username, isTelegramUsername); err != nil {
 		log.Default().Println("failed to add user to participants table:", err)
 		return "", nil, nil, fmt.Errorf("invalid form data: %w", err)

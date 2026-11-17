@@ -1,6 +1,7 @@
 package api
 
 import (
+	"boardgame-night-bot/src/auth"
 	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
@@ -13,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -40,9 +42,19 @@ type Controller struct {
 	Hook           *hooks.WebhookClient
 	Service        *Service
 	Limiter        *limiter.Limiter
+	LoginLimiter   *limiter.Limiter
+	Auth           *auth.Service
+	BotUsername    string
+	BaseURL        string
+	SecureCookies  bool
 }
 
-func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, service *Service) *Controller {
+func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, service *Service, authService *auth.Service, baseURL string) *Controller {
+	botUsername := ""
+	if bot != nil && bot.Me != nil {
+		botUsername = bot.Me.Username
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
 	return &Controller{
 		Router:         router,
 		DB:             db,
@@ -52,6 +64,12 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGSe
 		Hook:           hook,
 		Service:        service,
 		Limiter:        limiter.NewLimiter(5, 5),
+		// ~1 login email request every 10s per IP, burst of 3
+		LoginLimiter:  limiter.NewLimiterPerSecond(0.1, 3),
+		Auth:          authService,
+		BotUsername:   botUsername,
+		BaseURL:       baseURL,
+		SecureCookies: strings.HasPrefix(baseURL, "https://"),
 	}
 }
 
@@ -68,13 +86,30 @@ func (c *Controller) InjectRoute() {
 	c.Router.GET("/health", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	c.Router.POST("/events", c.CreateEvent)
-	c.Router.GET("/events/:event_id", c.GetEvent)
-	c.Router.GET("/events/:event_id/games/:game_id", c.GetGame)
-	c.Router.POST("/events/:event_id/games/:game_id", c.UpdateGame)
-	c.Router.DELETE("/events/:event_id/games/:game_id", c.DeleteGame)
-	c.Router.POST("/events/:event_id/add-game", c.AddGame)
-	c.Router.POST("/events/:event_id/join", c.AddPlayer)
+	// Web routes resolve the visitor identity server-side (verified Telegram
+	// init data or session cookie). Webhooks below authenticate on their own.
+	web := c.Router.Group("/", c.Auth.Middleware(c.SecureCookies))
+	web.POST("/events", c.CreateEvent)
+	web.GET("/events/:event_id", c.GetEvent)
+	web.GET("/events/:event_id/viewer", c.EventViewer)
+	web.POST("/events/:event_id/settings", c.UpdateEventSettings)
+	web.GET("/events/:event_id/games/:game_id", c.GetGame)
+	web.POST("/events/:event_id/games/:game_id", c.UpdateGame)
+	web.DELETE("/events/:event_id/games/:game_id", c.DeleteGame)
+	web.POST("/events/:event_id/add-game", c.AddGame)
+	web.POST("/events/:event_id/join", c.AddPlayer)
+	web.POST("/events/:event_id/leave", c.RemovePlayer)
+
+	web.GET("/login", c.LoginPage)
+	web.POST("/login", c.LoginLimiter.GinHandlerByClientIP(), c.Login)
+	web.GET("/auth/verify", c.VerifyPage)
+	web.POST("/auth/verify", c.LoginLimiter.GinHandlerByClientIP(), c.Verify)
+	web.POST("/logout", c.Logout)
+	web.GET("/account", c.AccountPage)
+	web.POST("/account/username", c.SetUsername)
+	web.POST("/account/link-telegram", c.LinkTelegramViaBot)
+	web.POST("/account/link-telegram-webapp", c.LinkTelegramViaWebApp)
+
 	c.Router.GET("/bgg/search", c.BggSearch)
 	c.Router.POST(
 		"/webhooks/:webhook_id",
@@ -171,6 +206,7 @@ func (c *Controller) Index(ctx *gin.Context) {
 			"OnlyAuthorCanAddGames": localizer.MustLocalizeMessage(&i18n.Message{ID: "WebOnlyAuthorCanAddGames"}),
 			"AllowAnyoneToJoin":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAllowAnyoneToJoin"}),
 			"CreateEvent":           localizer.MustLocalizeMessage(&i18n.Message{ID: "WebCreateEvent"}),
+			"AllowExternal":         localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAllowExternal"}),
 		})
 		return
 	}
@@ -200,6 +236,16 @@ func (c *Controller) NoRoute(ctx *gin.Context) {
 func (c *Controller) CreateEvent(ctx *gin.Context) {
 	var err error
 
+	p := c.principalOrAbort(ctx, false)
+	if p == nil {
+		return
+	}
+	if p.External {
+		// Events live in Telegram chats: only Telegram identities can create them.
+		c.renderError(ctx, nil, nil, "Only Telegram users can create events")
+		return
+	}
+
 	var newEvent models.CreateEventRequest
 	if err = ctx.ShouldBind(&newEvent); err != nil {
 		log.Default().Println("failed to bind form:", err)
@@ -220,10 +266,16 @@ func (c *Controller) CreateEvent(ctx *gin.Context) {
 	}
 
 	var event *models.Event
-	if event, err = c.Service.CreateEvent(newEvent.ChatID, newEvent.ThreadID, nil, newEvent.UserID, newEvent.UserName, newEvent.Name, newEvent.Location, newEvent.StartsAt, bool(newEvent.AllowGeneralJoin)); err != nil {
+	if event, err = c.Service.CreateEvent(newEvent.ChatID, newEvent.ThreadID, nil, p.UserID, p.DisplayName, newEvent.Name, newEvent.Location, newEvent.StartsAt, bool(newEvent.AllowGeneralJoin)); err != nil {
 		log.Default().Println("failed to create event:", err)
 		c.renderError(ctx, nil, nil, "Failed to create event")
 		return
+	}
+
+	if newEvent.AllowExternal {
+		if _, err = c.Service.SetAllowExternal(event.ID, p.UserID, true); err != nil {
+			log.Default().Println("failed to open event to external users:", err)
+		}
 	}
 
 	ctx.Redirect(http.StatusFound, fmt.Sprintf("/events/%s", event.ID))
@@ -285,6 +337,10 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 		"MaxPlayers":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
 		"AddToCalendar":  localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAddToCalendar"}),
 		"QueuedLang":     c.DB.GetPreferredLanguage(event.ChatID),
+		"ShareURL":       event.ShareURL(c.BaseURL),
+		"MiniAppURL":     fmt.Sprintf("%s?startapp=%s", c.Service.Url.BotMiniAppURL, event.ID),
+		"ExternalMarker": models.ExternalUserMarker,
+		"T":              c.messages(localizer),
 	})
 }
 
@@ -451,12 +507,19 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 		return
 	}
 
+	p := c.principalOrAbort(ctx, false)
+	if p == nil {
+		return
+	}
+
 	var bg models.UpdateGameRequest
 	if err = ctx.ShouldBind(&bg); err != nil {
 		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form")
 		return
 	}
+	bg.UserID = p.UserID
+	bg.UserName = p.DisplayName
 
 	var event *models.Event
 	var game *models.BoardGame
@@ -467,7 +530,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 		if event != nil {
 			chatID = &event.ChatID
 		}
-		c.renderError(ctx, &eventID, chatID, "Failed to update game")
+		c.renderError(ctx, &eventID, chatID, failureText(err, "Failed to update game"))
 		return
 	}
 
@@ -525,13 +588,12 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 		c.renderError(ctx, nil, nil, "Invalid game ID")
 		return
 	}
-	userID, err2 := strconv.ParseInt(ctx.Query("user_id"), 10, 64)
-	if err2 != nil {
-		c.renderError(ctx, nil, nil, "Invalid user ID")
+	p := c.principalOrAbort(ctx, true)
+	if p == nil {
 		return
 	}
-
-	username := ctx.Query("username")
+	userID := p.UserID
+	username := p.DisplayName
 
 	if !models.IsValidUUID(eventID) {
 		c.renderError(ctx, nil, nil, "Invalid event ID")
@@ -550,11 +612,7 @@ func (c *Controller) DeleteGame(ctx *gin.Context) {
 
 	if event, game, err = c.Service.DeleteGame(eventID, gameUUID, userID, username); err != nil {
 		log.Default().Println("failed to delete game:", err)
-		var chatID *int64
-		if event != nil {
-			chatID = &event.ChatID
-		}
-		c.renderError(ctx, &eventID, chatID, "Failed to delete game")
+		ctx.JSON(c.externalErrorStatus(err), gin.H{"error": failureText(err, "Failed to delete game")})
 		return
 	}
 
@@ -582,12 +640,18 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		return
 	}
 
+	p := c.principalOrAbort(ctx, false)
+	if p == nil {
+		return
+	}
+
 	var bg models.AddGameRequest
 	if err = ctx.ShouldBind(&bg); err != nil {
 		log.Default().Println("failed to bind form:", err)
 		c.renderError(ctx, nil, nil, "Invalid submitted form data")
 		return
 	}
+	bg.UserID = p.UserID
 
 	var event *models.Event
 	var game *models.BoardGame
@@ -598,7 +662,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		if event != nil {
 			chatID = &event.ChatID
 		}
-		c.renderError(ctx, &eventID, chatID, "Failed to add game")
+		c.renderError(ctx, &eventID, chatID, failureText(err, "Failed to add game"))
 		return
 	}
 
@@ -627,8 +691,8 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		Data: models.HookNewGamePayload{
 			ID:         game.UUID,
 			EventID:    event.ID,
-			UserID:     event.UserID,
-			UserName:   event.UserName,
+			UserID:     p.UserID,
+			UserName:   p.DisplayName,
 			Name:       bg.Name,
 			MaxPlayers: int(game.MaxPlayers),
 			MessageID:  nil,
@@ -653,19 +717,28 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 		return
 	}
 
+	p := c.principalOrAbort(ctx, true)
+	if p == nil {
+		return
+	}
+
 	var addPlayer models.AddPlayerRequest
 	if err = ctx.ShouldBindJSON(&addPlayer); err != nil {
 		log.Default().Println("failed to bind form:", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
 		return
 	}
+	// Identity comes from the server-side principal, never from the body.
+	addPlayer.UserID = p.UserID
+	addPlayer.UserName = p.DisplayName
+	addPlayer.IsTelegramUsername = p.IsTelegramUsername
 
 	var participantID string
 	var event *models.Event
 	var game *models.BoardGame
 	if participantID, event, game, err = c.Service.AddPlayer(nil, eventID, addPlayer.GameID, addPlayer.UserID, addPlayer.UserName, addPlayer.IsTelegramUsername); err != nil {
 		log.Default().Println("failed to add player:", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid form data"})
+		ctx.JSON(c.externalErrorStatus(err), gin.H{"error": failureText(err, "Invalid form data")})
 		return
 	}
 
@@ -682,6 +755,56 @@ func (c *Controller) AddPlayer(ctx *gin.Context) {
 			AddedAt:  time.Now(),
 		},
 	})
+}
+
+// RemovePlayer lets the visitor leave the event from the web (the Telegram
+// "not coming" button is not available to web-only users).
+func (c *Controller) RemovePlayer(ctx *gin.Context) {
+	eventID := ctx.Param("event_id")
+	if !models.IsValidUUID(eventID) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		return
+	}
+	p := c.principalOrAbort(ctx, true)
+	if p == nil {
+		return
+	}
+
+	participantID, event, game, err := c.Service.DeletePlayer(eventID, p.UserID)
+	if err != nil {
+		if errors.Is(err, database.ErrNoRows) {
+			ctx.JSON(http.StatusOK, gin.H{"message": "Not participating."})
+			return
+		}
+		log.Default().Println("failed to remove player:", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to remove participant"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Player removed."})
+
+	if event != nil && game != nil {
+		c.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
+			Type: models.HookWebhookTypeRemoveParticipant,
+			Data: models.HookRemoveParticipantPayload{
+				ID:        participantID,
+				EventID:   event.ID,
+				GameID:    game.UUID,
+				UserID:    p.UserID,
+				UserName:  p.DisplayName,
+				RemovedAt: time.Now(),
+			},
+		})
+	}
+}
+
+// failureText exposes the external-access refusal to the user; other errors
+// keep their generic message.
+func failureText(err error, fallback string) string {
+	if errors.Is(err, ErrExternalNotAllowed) {
+		return ErrExternalNotAllowed.Error()
+	}
+	return fallback
 }
 
 func P(x string) *string {

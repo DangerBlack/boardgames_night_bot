@@ -162,7 +162,7 @@
             <div class="participants">
                 {{ if .Game.Participants }}
                     {{ range .Game.Participants }}
-                    <p>- {{ .UserName }}</p>
+                    <p>- {{ .UserName }}{{ if lt .UserID 0 }} ✉️{{ end }}</p>
                     {{ end }}
                 {{ else }}
                     <p>- {{ $noParticipants }}</p>
@@ -170,17 +170,16 @@
             </div>
         </div>
         <div class="left-button">
-            <button class="delete" value="{{ .ID }}">{{ .Delete }}</button>
+            <button class="delete" value="{{ .ID }}" style="display: none;">{{ .Delete }}</button>
         </div>
     </div>
-    <div id="auth">
+    <div id="auth" style="display: none;">
         <div class="add-game">
             <h3>{{ .UpdateGame }}</h3>
             <form action="/events/{{ .Id }}/games/{{ .Game.ID }}" method="POST">
                 <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
                 <input type="text" name="bgg_url" placeholder="BGG URL">
-                <input type="text" name="user_id" placeholder="Your id" id="userID" required hidden>
-                <input type="text" name="user_name" placeholder="Your username" id="userName" required hidden>
+                <input type="hidden" name="tg_init_data" class="tg-init-data">
                 <label><input type="checkbox" name="unlink"> {{ .UnlinkFormBoardGameGeek }}</label>
                 <button type="submit">{{ .Update }}</button>
             </form>
@@ -189,18 +188,20 @@
     <a href="/events/{{ .Id }}" class="back-button">⬅️ Back</a>
 
     <script>
-        var user = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-        var username = user.username || `${user.first_name} ${user.last_name}`;
+        var webApp = window?.Telegram?.WebApp;
+        var initData = (webApp && webApp.initData) || "";
+        var authHeaders = initData ? { "X-Telegram-Init-Data": initData } : {};
+        document.querySelectorAll(".tg-init-data").forEach(function (el) { el.value = initData; });
 
-        if(user)
-        { 
-            document.getElementById("userID").value = user.id;
-            document.getElementById("userName").value = username;
-        }
-        else {
-            document.getElementById("auth").setAttribute("style", "display: none;");
-            document.getElementsByClassName("delete")[0].setAttribute("style", "display: none;");
-        }
+        // The server decides who the visitor is; only show controls they can use.
+        fetch("/events/{{ .Id }}/viewer", { headers: authHeaders, credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (v) {
+                if (!v.authenticated || !v.can_act) return;
+                document.getElementById("auth").removeAttribute("style");
+                document.getElementsByClassName("delete")[0].removeAttribute("style");
+            })
+            .catch(function (err) { console.error("viewer:", err); });
 
         function deleteEntity(eventId, gameId, confirmationText) {
             // confirm does not work on linux desktop
@@ -208,11 +209,10 @@
                 return;
             }
 
-            fetch(`/events/${eventId}/games/${gameId}?user_id=${user.id}&username=${username}`, {
+            fetch(`/events/${eventId}/games/${gameId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                credentials: 'same-origin',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders)
             })
             .then(response => {
                 if (!response.ok) {

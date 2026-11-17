@@ -1,0 +1,164 @@
+{{ define "auth_head" }}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px 16px; background-color: #f4f4f9; color: #222; }
+    .container { max-width: 520px; margin: 30px auto; background: #fff; padding: 24px; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); }
+    h1 { color: #333; font-size: 1.5em; margin-top: 0; }
+    h2 { font-size: 1.1em; margin-bottom: 6px; }
+    p { line-height: 1.45; }
+    .muted { color: #666; font-size: 0.9em; }
+    .error { background: #fdecea; color: #a12622; padding: 10px 12px; border-radius: 6px; }
+    input[type=email], input[type=text] { width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 1em; }
+    button, .button { display: inline-block; padding: 10px 20px; background: #007bff; color: #fff; border: none; border-radius: 5px; font-size: 1em; cursor: pointer; text-decoration: none; }
+    button:hover, .button:hover { background: #0056b3; }
+    button.secondary { background: #6c757d; }
+    .choice { border: 1px solid #e3e3e8; border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+    .hidden { display: none; }
+</style>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+{{ end }}
+
+{{ define "login" }}
+<!DOCTYPE html>
+<html>
+<head>
+    {{ template "auth_head" }}
+    <title>{{ .T.WebLoginTitle }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 {{ .T.WebLoginTitle }}</h1>
+        {{ if .EmailEnabled }}
+        <p>{{ .T.WebLoginIntro }}</p>
+        <form action="/login" method="post">
+            <label for="email">{{ .T.WebEmail }}</label>
+            <input type="email" id="email" name="email" autocomplete="email" required autofocus>
+            <input type="hidden" name="next" value="{{ .Next }}">
+            <button type="submit">{{ .T.WebSendLink }}</button>
+        </form>
+        {{ else }}
+        <p class="error">{{ .T.WebEmailDisabled }}</p>
+        {{ end }}
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "verify" }}
+<!DOCTYPE html>
+<html>
+<head>
+    {{ template "auth_head" }}
+    <title>{{ .T.WebVerifyTitle }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 {{ .T.WebVerifyTitle }}</h1>
+        <form action="/auth/verify" method="post">
+            <input type="hidden" name="token" value="{{ .Token }}">
+            <input type="hidden" name="next" value="{{ .Next }}">
+            <button type="submit">{{ .T.WebVerifyButton }}</button>
+        </form>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "message" }}
+<!DOCTYPE html>
+<html>
+<head>
+    {{ template "auth_head" }}
+    <title>{{ .Title }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ .Title }}</h1>
+        {{ if .Body }}<p>{{ .Body }}</p>{{ end }}
+        {{ if .Next }}<p><a class="button" href="{{ .Next }}">{{ .T.WebLoginTitle }}</a></p>{{ end }}
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{ define "account" }}
+<!DOCTYPE html>
+<html>
+<head>
+    {{ template "auth_head" }}
+    <title>{{ .T.WebAccountTitle }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>👤 {{ .T.WebAccountTitle }}</h1>
+        {{ if .Email }}<p class="muted">✉️ {{ .Email }}</p>{{ end }}
+        {{ if .Error }}<p class="error">{{ .Error }}</p>{{ end }}
+
+        {{ if eq .State "linked" }}
+            <p>{{ .T.WebAccountLinked }} <b>{{ .TelegramName }}</b> ✅</p>
+            {{ if ne .Next "/account" }}<p><a class="button" href="{{ .Next }}">{{ .T.WebBack }}</a></p>{{ end }}
+        {{ else }}
+            {{ if eq .State "pending" }}
+                <p>{{ .T.WebAccountPendingIntro }}</p>
+            {{ else }}
+                <p>{{ .T.WebAccountSeparated }} <b>{{ .Username }}</b> {{ "✉️" }}</p>
+                {{ if ne .Next "/account" }}<p><a class="button" href="{{ .Next }}">{{ .T.WebBack }}</a></p>{{ end }}
+                <p class="muted">{{ .T.WebLinkLaterBody }}</p>
+            {{ end }}
+
+            <div class="choice">
+                <h2>📱 {{ .T.WebClaimTelegramTitle }}</h2>
+                <p class="muted">{{ .T.WebClaimTelegramBody }}</p>
+                <!-- Inside the Telegram mini-app we already know (and the server verifies) who the user is. -->
+                <div id="link-webapp" class="hidden">
+                    <button type="button" id="link-webapp-button">{{ .T.WebLinkThisTelegram }} (<span id="tg-name"></span>)</button>
+                    <p id="link-webapp-error" class="error hidden"></p>
+                </div>
+                <form id="link-bot" action="/account/link-telegram" method="post">
+                    <button type="submit">{{ .T.WebClaimTelegramButton }}</button>
+                </form>
+            </div>
+
+            {{ if eq .State "pending" }}
+            <div class="choice">
+                <h2>✉️ {{ .T.WebSeparateTitle }}</h2>
+                <p class="muted">{{ .T.WebSeparateBody }}</p>
+                <form action="/account/username" method="post">
+                    <label for="username">{{ .T.WebUsername }}</label>
+                    <input type="text" id="username" name="username" minlength="3" maxlength="32" required>
+                    <input type="hidden" name="next" value="{{ .Next }}">
+                    <button type="submit">{{ .T.WebSaveUsername }}</button>
+                </form>
+            </div>
+            {{ end }}
+        {{ end }}
+
+        <form action="/logout" method="post" style="margin-top: 24px">
+            <button type="submit" class="secondary">{{ .T.WebSignOut }}</button>
+        </form>
+    </div>
+    <script>
+        (function () {
+            var wa = window.Telegram && window.Telegram.WebApp;
+            var box = document.getElementById("link-webapp");
+            if (!wa || !wa.initData || !box) return;
+            var u = wa.initDataUnsafe && wa.initDataUnsafe.user;
+            if (!u) return;
+            document.getElementById("tg-name").innerText = u.username ? "@" + u.username : [u.first_name, u.last_name].filter(Boolean).join(" ");
+            box.classList.remove("hidden");
+            document.getElementById("link-webapp-button").addEventListener("click", function () {
+                fetch("/account/link-telegram-webapp", { method: "POST", headers: { "X-Telegram-Init-Data": wa.initData } })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                    .then(function (res) {
+                        if (res.ok) { location.reload(); return; }
+                        var e = document.getElementById("link-webapp-error");
+                        e.innerText = res.d.error || "Error";
+                        e.classList.remove("hidden");
+                    });
+            });
+        })();
+    </script>
+</body>
+</html>
+{{ end }}
