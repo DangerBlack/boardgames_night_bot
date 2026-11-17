@@ -269,11 +269,10 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 		msg += "📍 <b>" + EscapeHTML(*e.Location) + "</b>\n"
 	}
 	// When people outside Telegram may join, put the public link in the text
-	// rather than in a button: it survives forwarding and copy-paste.
+	// rather than in a button, so it survives forwarding.
 	if e.AllowExternal && webUrl.BaseUrl != "" {
-		link := e.ShareURL(webUrl.BaseUrl)
-		short := strings.TrimPrefix(strings.TrimPrefix(link, "https://"), "http://")
-		msg += fmt.Sprintf("🔗 <a href=\"%s\">%s</a>\n", EscapeHTML(link), EscapeHTML(short))
+		label := localizer.MustLocalizeMessage(&i18n.Message{ID: "EventLink"})
+		msg += fmt.Sprintf("🔗 <a href=\"%s\">%s</a>\n", EscapeHTML(e.ShareURL(webUrl.BaseUrl)), EscapeHTML(label))
 	}
 	if e.Location != nil || e.StartsAt != nil || (e.AllowExternal && webUrl.BaseUrl != "") {
 		msg += "\n"

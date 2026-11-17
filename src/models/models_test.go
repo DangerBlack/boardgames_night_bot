@@ -375,7 +375,7 @@ func TestFormatMsgShareLinkInText(t *testing.T) {
 	e := Event{ID: "e1", Name: "Night", AllowExternal: true}
 
 	msg, markup := e.FormatMsg(localizer, web)
-	if !strings.Contains(msg, `🔗 <a href="https://bgn.example/events/e1">bgn.example/events/e1</a>`) {
+	if !strings.Contains(msg, `🔗 <a href="https://bgn.example/events/e1">Event link</a>`) {
 		t.Fatalf("expected share link in text, got:\n%s", msg)
 	}
 	for _, row := range markup.InlineKeyboard {
