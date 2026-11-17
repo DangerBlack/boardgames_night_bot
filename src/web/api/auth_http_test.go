@@ -362,3 +362,46 @@ func TestDeleteSeparatedAccountRemovesParticipations(t *testing.T) {
 		t.Fatal("session survived account deletion")
 	}
 }
+
+func signedWebhookRequest(t *testing.T, webhookUUID, secret string, date time.Time) *http.Request {
+	t.Helper()
+	body := []byte(`{"type":"test","data":{"message":"hi"}}`)
+	sum := sha256.Sum256(body)
+	contentHash := hex.EncodeToString(sum[:])
+	d := date.UTC().Format(time.RFC1123)
+	req := httptest.NewRequest("POST", "/webhooks/"+webhookUUID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-ms-date", d)
+	req.Header.Set("x-ms-content-sha256", contentHash)
+	req.Header.Set("X-BGNB-Signature", hooks.ComputeHMACBase64(d+";"+contentHash, []byte(secret)))
+	return req
+}
+
+func TestWebhookRejectsReplayAndFutureDates(t *testing.T) {
+	e := newHTTPEnv(t)
+	const secret = "s3cr3t-s3cr3t-s3cr3t"
+	_, webhookUUID, err := e.db.InsertWebhook(100, nil, "https://example.com/hook", secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	send := func(r *http.Request) int {
+		w := httptest.NewRecorder()
+		e.router.ServeHTTP(w, r)
+		return w.Code
+	}
+
+	if code := send(signedWebhookRequest(t, *webhookUUID, secret, now)); code != http.StatusOK {
+		t.Fatalf("first delivery: %d", code)
+	}
+	if code := send(signedWebhookRequest(t, *webhookUUID, secret, now)); code != http.StatusConflict {
+		t.Fatalf("replay accepted: %d", code)
+	}
+	if code := send(signedWebhookRequest(t, *webhookUUID, secret, now.Add(10*time.Minute))); code != http.StatusUnauthorized {
+		t.Fatalf("future-dated request accepted: %d", code)
+	}
+	if code := send(signedWebhookRequest(t, *webhookUUID, secret, now.Add(-5*time.Minute))); code != http.StatusUnauthorized {
+		t.Fatalf("stale request accepted: %d", code)
+	}
+}

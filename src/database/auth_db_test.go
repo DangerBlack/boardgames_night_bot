@@ -214,3 +214,52 @@ func TestLinkTelegramMergesSeparatedAccount(t *testing.T) {
 		t.Fatalf("expected ErrAccountAlreadyLinked, got %v", err)
 	}
 }
+
+func TestForeignKeysCascadeAndOrphanCleanup(t *testing.T) {
+	d := newV7DB(t)
+
+	var fk int
+	if err := d.db.QueryRow(`PRAGMA foreign_keys`).Scan(&fk); err != nil || fk != 1 {
+		t.Fatalf("foreign_keys = %d, %v", fk, err)
+	}
+
+	// Cascade: deleting an event removes its games and participants.
+	id, _ := d.InsertEventWithOptionalGame(nil, 1, 1, "a", "x", nil, nil, true)
+	ev, _ := d.SelectEventByEventID(id)
+	d.InsertParticipant(nil, id, ev.BoardGames[0].ID, 5, "p", false)
+	if err := d.DeleteEvent(id); err != nil {
+		t.Fatal(err)
+	}
+	var games, parts int
+	d.db.QueryRow(`SELECT COUNT(*) FROM boardgames`).Scan(&games)
+	d.db.QueryRow(`SELECT COUNT(*) FROM participants`).Scan(&parts)
+	if games != 0 || parts != 0 {
+		t.Fatalf("cascade failed: %d games, %d participants left", games, parts)
+	}
+
+	// Orphans created while FKs were off (as in production) are purged.
+	conn, err := d.db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	for _, q := range []string{
+		`PRAGMA foreign_keys = OFF`,
+		`INSERT INTO boardgames (uuid, event_id, name, max_players) VALUES ('g-orphan', 'gone', 'x', 4)`,
+		`INSERT INTO participants (uuid, event_id, boardgame_id, user_id, user_name) VALUES ('p-orphan', 'gone', 9999, 7, 'x')`,
+		`PRAGMA foreign_keys = ON`,
+	} {
+		if _, err = conn.ExecContext(t.Context(), q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	conn.Close()
+
+	d.MigrateToV8()
+	d.MigrateToV8()
+	d.db.QueryRow(`SELECT COUNT(*) FROM boardgames`).Scan(&games)
+	d.db.QueryRow(`SELECT COUNT(*) FROM participants`).Scan(&parts)
+	if games != 0 || parts != 0 {
+		t.Fatalf("orphans not purged: %d games, %d participants", games, parts)
+	}
+}

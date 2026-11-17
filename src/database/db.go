@@ -48,8 +48,17 @@ type DatabaseService interface {
 
 var ErrNoRows = errors.New("sql: no rows in result set")
 
+// sqliteDSNOptions applies to every pooled connection (a PRAGMA run through
+// db.Exec would only reach one of them):
+//   - foreign keys: SQLite ships with them off, so ON DELETE CASCADE never ran
+//     and deleted events left their games and participants behind;
+//   - busy timeout: the bot and the web server write concurrently; wait for
+//     the lock instead of failing with "database is locked";
+//   - WAL: readers no longer block the writer.
+const sqliteDSNOptions = "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL"
+
 func NewDatabase(path string) *Database {
-	db, err := sql.Open("sqlite3", filepath.Join(path, "bot_data.sqlite"))
+	db, err := sql.Open("sqlite3", filepath.Join(path, "bot_data.sqlite")+sqliteDSNOptions)
 	if err != nil {
 		log.Fatal("failed to open database '"+filepath.Join(path, "bot_data.sqlite")+"':", err)
 	}

@@ -39,7 +39,7 @@ func NewWebhookClient(db *database.Database, timeout time.Duration, maxAttempt i
 	failureCache := gcache.New(1000).LRU().Expiration(failureExpiration).Build()
 	return &WebhookClient{
 		DB:                 db,
-		Client:             &http.Client{Timeout: timeout},
+		Client:             NewSafeHTTPClient(timeout, allowLocalWebhooks()),
 		MaxAttempt:         maxAttempt,
 		FailureCache:       failureCache,
 		MaxFailuresAttempt: maxFailureAttempt,

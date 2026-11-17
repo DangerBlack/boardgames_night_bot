@@ -779,7 +779,7 @@ func (t Telegram) RegisterWebhook(c telebot.Context) error {
 		log.Default().Println("failed to delete test message:", err)
 	}
 
-	log.Default().Printf("Registering webhook %s with secret %s in chat %d", webhookUrl, secret, chatID)
+	log.Default().Printf("Registering webhook %s in chat %d", webhookUrl, chatID)
 
 	threadIDx := c.Message().ThreadID
 
