@@ -96,6 +96,9 @@ func (s *Service) CreateEvent(chatID int64, threadID *int64, id *string, userID 
 // event whose owner has not opened it to people outside Telegram.
 var ErrExternalNotAllowed = errors.New("this event is not open to people outside Telegram")
 
+// ErrGameNotInEvent is returned when a game ID does not belong to the event.
+var ErrGameNotInEvent = errors.New("game does not belong to this event")
+
 // ErrNotEventOwner is returned when someone other than the owner changes event settings.
 var ErrNotEventOwner = errors.New("only the event owner can change this setting")
 
@@ -164,8 +167,8 @@ func (s *Service) DeleteEvent(eventID string, userID *int64, userName string) er
 			ID: "EventHasBeenDeleted",
 		},
 		TemplateData: map[string]string{
-			"Username": userName,
-			"Event":    event.Name,
+			"Username": models.EscapeHTML(userName),
+			"Event":    models.EscapeHTML(event.Name),
 		},
 	})
 
@@ -467,9 +470,9 @@ func (s *Service) DeleteGame(eventID string, gameUUID string, userID int64, user
 			ID: "GameHasBeenDeleted",
 		},
 		TemplateData: map[string]string{
-			"Username": username,
-			"Game":     game.Name,
-			"Event":    event.Name,
+			"Username": models.EscapeHTML(username),
+			"Game":     models.EscapeHTML(game.Name),
+			"Event":    models.EscapeHTML(event.Name),
 		},
 	})
 
@@ -497,14 +500,22 @@ func (s *Service) AddPlayer(id *string, eventID string, gameID int64, userID int
 	var err error
 	var participantID string
 
+	var current *models.Event
+	if current, err = s.DB.SelectEventByEventID(eventID); err != nil {
+		return "", nil, nil, fmt.Errorf("invalid event ID: %w", err)
+	}
+
+	// The game must belong to this event. Participants are listed per game, so
+	// joining game X "through" another event would show the user in X's event,
+	// bypassing that event's access rules (e.g. allow_external).
+	if utils.PickGame(current, gameID) == nil {
+		return "", current, nil, ErrGameNotInEvent
+	}
+
+	if err = checkExternalAccess(current, userID); err != nil {
+		return "", current, nil, err
+	}
 	if models.IsExternalUserID(userID) {
-		var event *models.Event
-		if event, err = s.DB.SelectEventByEventID(eventID); err != nil {
-			return "", nil, nil, fmt.Errorf("invalid event ID: %w", err)
-		}
-		if err = checkExternalAccess(event, userID); err != nil {
-			return "", event, nil, err
-		}
 		// web-only names are never Telegram handles
 		isTelegramUsername = false
 	}

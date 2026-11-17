@@ -302,6 +302,61 @@ func (d *Database) LinkTelegram(userID, telegramUserID int64, telegramName strin
 	return eventIDs, tx.Commit()
 }
 
+// DeleteUser erases an account. A separated account's participations exist
+// only through it, so they are deleted too; a linked account's participations
+// belong to the Telegram user and are kept. Returns the events to re-render.
+func (d *Database) DeleteUser(userID int64) ([]string, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var email sql.NullString
+	if err = tx.QueryRow(`SELECT email FROM users WHERE id = ?;`, userID).Scan(&email); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNoRows
+		}
+		return nil, err
+	}
+
+	externalID := models.ExternalUserID(userID)
+	rows, err := tx.Query(`SELECT DISTINCT event_id FROM participants WHERE user_id = ?;`, externalID)
+	if err != nil {
+		return nil, err
+	}
+	var eventIDs []string
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		eventIDs = append(eventIDs, id)
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Foreign keys are not enforced on this connection, so clean up explicitly.
+	steps := []struct {
+		q    string
+		args []any
+	}{
+		{`DELETE FROM participants WHERE user_id = ?;`, []any{externalID}},
+		{`DELETE FROM sessions WHERE user_id = ?;`, []any{userID}},
+		{`DELETE FROM auth_tokens WHERE user_id = ? OR (email IS NOT NULL AND email = ?);`, []any{userID, email}},
+		{`DELETE FROM users WHERE id = ?;`, []any{userID}},
+	}
+	for _, st := range steps {
+		if _, err = tx.Exec(st.q, st.args...); err != nil {
+			return nil, fmt.Errorf("delete user: %w", err)
+		}
+	}
+	return eventIDs, tx.Commit()
+}
+
 // ---- sessions ----
 
 func (d *Database) CreateSession(tokenHash string, userID int64, expiresAt time.Time) error {

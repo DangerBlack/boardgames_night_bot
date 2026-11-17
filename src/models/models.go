@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"html"
 	"log"
 	"net/url"
 	"regexp"
@@ -174,7 +175,7 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 
 	link := ""
 	if bg.BggUrl != nil && bg.BggName != nil && *bg.BggUrl != "" && *bg.BggName != "" {
-		link = fmt.Sprintf(" - <a href='%s'>%s</a>\n", *bg.BggUrl, *bg.BggName)
+		link = fmt.Sprintf(" - <a href='%s'>%s</a>\n", EscapeHTML(*bg.BggUrl), EscapeHTML(*bg.BggName))
 	}
 
 	name := bg.Name
@@ -188,9 +189,9 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 		players = fmt.Sprintf("(%d %s)", len(bg.Participants), localizer.MustLocalizeMessage(&i18n.Message{ID: "Players"}))
 	}
 
-	msg += fmt.Sprintf("🎲 <b>%s [%s]</b> %s %s\n", link, name, players, complete)
+	msg += fmt.Sprintf("🎲 <b>%s [%s]</b> %s %s\n", link, EscapeHTML(name), players, complete)
 	for i, p := range bg.Participants {
-		display := p.UserName
+		display := EscapeHTML(p.UserName)
 		// Calculate queue position for players beyond max capacity
 		// Skip if MaxPlayers is UnlimitedPlayers (-1)
 		if maxPlayers := int(bg.MaxPlayers); maxPlayers != UnlimitedPlayers && i >= maxPlayers {
@@ -242,9 +243,9 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *telebot.ReplyMarkup) {
 	btns := []telebot.InlineButton{}
 
-	msg := "📆 <b>" + e.Name + "</b>\n\n"
+	msg := "📆 <b>" + EscapeHTML(e.Name) + "</b>\n\n"
 	if e.UserName != "" {
-		msg += "👑 <b>" + e.UserName + "</b>\n"
+		msg += "👑 <b>" + EscapeHTML(e.UserName) + "</b>\n"
 	}
 	if e.StartsAt != nil {
 		gTitle := url.QueryEscape(e.Name)
@@ -259,10 +260,10 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 		}
 
 		googleCalendarLink := fmt.Sprintf("https://www.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&ctz=%s&details=%s&location=%s&sf=true&output=xml", gTitle, gStart, gEnd, gtz, gDetails, gLocation)
-		msg += fmt.Sprintf("⏰ <b><a href=\"%s\">%s</a></b>\n", googleCalendarLink, e.StartsAt.Format("2006-01-02 15:04"))
+		msg += fmt.Sprintf("⏰ <b><a href=\"%s\">%s</a></b>\n", EscapeHTML(googleCalendarLink), e.StartsAt.Format("2006-01-02 15:04"))
 	}
 	if e.Location != nil && *e.Location != "" {
-		msg += "📍 <b>" + *e.Location + "</b>\n"
+		msg += "📍 <b>" + EscapeHTML(*e.Location) + "</b>\n"
 	}
 	if e.Location != nil || e.StartsAt != nil {
 		msg += "\n"
@@ -357,6 +358,14 @@ func IsValidUUID(u string) bool {
 // Telegram mini-app from there.
 func (e Event) ShareURL(baseURL string) string {
 	return strings.TrimRight(baseURL, "/") + "/events/" + e.ID
+}
+
+// EscapeHTML makes user-provided text safe to embed in Telegram HTML messages
+// (the bot sends everything with ParseMode HTML). Event, game and user names
+// come from Telegram users and, with email registration, from outsiders: left
+// raw they could inject links or break message rendering.
+func EscapeHTML(s string) string {
+	return html.EscapeString(s)
 }
 
 func (e Event) FormatStartAt() *string {

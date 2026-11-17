@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -72,6 +73,14 @@ func newHTTPEnv(t *testing.T) *httpEnv {
 	authSvc := auth.NewService(db, nil, auth.DefaultConfig(httpTestBotToken))
 
 	router := gin.New()
+	// Stubs for the helpers web.TemplateFuncs provides (importing web here would be a cycle).
+	router.SetFuncMap(template.FuncMap{
+		"int":        func(v any) int { return 0 },
+		"add":        func(a, b int) int { return a + b },
+		"sub":        func(a, b int) int { return a - b },
+		"queuedText": func(n int, lang string) string { return "" },
+	})
+	router.LoadHTMLGlob("../../../templates/*")
 	c := NewController(router.Group("/"), db, nil, nil, bundle, hooks.NewWebhookClient(db, time.Second, 1, time.Minute, 1), svc, authSvc, "https://example.com")
 	c.InjectRoute()
 
@@ -299,5 +308,57 @@ func TestLinkTelegramViaBotPayload(t *testing.T) {
 	}
 	if len(refreshed) != 1 || refreshed[0] != e.eventID {
 		t.Fatalf("refreshed = %v", refreshed)
+	}
+}
+
+func TestJoinRejectsGameFromAnotherEvent(t *testing.T) {
+	e := newHTTPEnv(t)
+	session, _ := e.separatedSession(t, "sneaky@example.com", "Sneaky")
+
+	// A second event, closed to outsiders.
+	closedID, err := e.db.InsertEventWithOptionalGame(nil, 200, ownerTelegramID, "owner", "Closed", nil, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed, _ := e.db.SelectEventByEventID(closedID)
+	closedGame := closed.BoardGames[0].ID
+
+	// Outsider is allowed in the first event only.
+	e.db.SetEventAllowExternal(e.eventID, true)
+
+	w := e.do("POST", "/events/"+e.eventID+"/join", map[string]any{"game_id": closedGame}, withSession(session))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("cross-event join: %d %s", w.Code, w.Body)
+	}
+	closed, _ = e.db.SelectEventByEventID(closedID)
+	if n := len(closed.BoardGames[0].Participants); n != 0 {
+		t.Fatalf("outsider leaked into closed event: %+v", closed.BoardGames[0].Participants)
+	}
+}
+
+func TestDeleteSeparatedAccountRemovesParticipations(t *testing.T) {
+	e := newHTTPEnv(t)
+	session, user := e.separatedSession(t, "bye@example.com", "Leaving")
+	e.db.SetEventAllowExternal(e.eventID, true)
+	if w := e.do("POST", "/events/"+e.eventID+"/join", map[string]any{"game_id": e.gameID}, withSession(session)); w.Code != http.StatusCreated {
+		t.Fatalf("join: %d", w.Code)
+	}
+
+	req := httptest.NewRequest("POST", "/account/delete", strings.NewReader("confirm=yes"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookie, Value: session})
+	w := httptest.NewRecorder()
+	e.router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete: %d %s", w.Code, w.Body)
+	}
+	if len(e.participants(t)) != 0 {
+		t.Fatal("participations of a deleted separated account must be removed")
+	}
+	if _, err := e.db.GetUserByID(user.ID); err == nil {
+		t.Fatal("user still exists")
+	}
+	if _, err := e.auth.SessionUser(session); err == nil {
+		t.Fatal("session survived account deletion")
 	}
 }

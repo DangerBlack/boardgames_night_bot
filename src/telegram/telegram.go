@@ -180,7 +180,7 @@ func (t Telegram) Start(c telebot.Context) error {
 			ID: "Open",
 		},
 		TemplateData: map[string]string{
-			"Name": event.Name,
+			"Name": models.EscapeHTML(event.Name),
 		},
 	})
 	return c.Send(openT, markup, opts)
@@ -364,7 +364,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 
 	link := ""
 	if game.BggUrl != nil && game.BggName != nil {
-		link = fmt.Sprintf(", <a href='%s'>%s</a>", *game.BggUrl, *game.BggName)
+		link = fmt.Sprintf(", <a href='%s'>%s</a>", models.EscapeHTML(*game.BggUrl), models.EscapeHTML(*game.BggName))
 	}
 
 	message := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
@@ -372,7 +372,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 			ID: "GameAdded",
 		},
 		TemplateData: map[string]string{
-			"Name":       gameName,
+			"Name":       models.EscapeHTML(gameName),
 			"Link":       link,
 			"MaxPlayers": strconv.Itoa(int(game.MaxPlayers)),
 		},
@@ -654,7 +654,7 @@ func (t Telegram) SetDefaultLocation(c telebot.Context) error {
 			ID: "LocationSet",
 		},
 		TemplateData: map[string]string{
-			"Location": location,
+			"Location": models.EscapeHTML(location),
 		},
 	})
 

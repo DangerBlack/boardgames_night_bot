@@ -49,6 +49,7 @@ type Store interface {
 	CreateSession(tokenHash string, userID int64, expiresAt time.Time) error
 	GetSessionUser(tokenHash string) (*models.User, error)
 	DeleteSession(tokenHash string) error
+	DeleteUser(userID int64) ([]string, error)
 }
 
 var _ Store = (*database.Database)(nil)
@@ -242,6 +243,18 @@ func (s *Service) ChooseSeparatedUsername(user *models.User, rawUsername string)
 		return err
 	}
 	return s.Store.SetSeparatedUsername(user.ID, username)
+}
+
+// DeleteAccount erases the account (see database.DeleteUser for what is kept).
+func (s *Service) DeleteAccount(user *models.User) error {
+	eventIDs, err := s.Store.DeleteUser(user.ID)
+	if err != nil {
+		return err
+	}
+	if len(eventIDs) > 0 && s.OnEventsChanged != nil {
+		s.OnEventsChanged(eventIDs)
+	}
+	return nil
 }
 
 // ---- Telegram linking ----

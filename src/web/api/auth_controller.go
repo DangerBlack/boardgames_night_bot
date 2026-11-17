@@ -32,6 +32,8 @@ var webMessageIDs = []string{
 	"WebSignInRequired", "WebSignedInAs", "WebSignOut", "WebSignInWithEmail", "WebOpenInTelegram",
 	"WebFinishAccountSetup", "WebShareEvent", "WebShareHint", "WebCopyLink", "WebLinkCopied",
 	"WebAllowExternal", "WebExternalNotAllowed", "WebLeaveEvent", "WebBack",
+	"WebPrivacyTitle", "WebPrivacyIntro", "WebPrivacyData", "WebPrivacyProcessors", "WebPrivacyRetention",
+	"WebPrivacyRights", "WebPrivacyContact", "WebDeleteAccount", "WebDeleteAccountConfirm", "WebAccountDeleted",
 }
 
 func (c *Controller) messages(localizer *i18n.Localizer) map[string]string {
@@ -251,6 +253,32 @@ func (c *Controller) LinkTelegramViaWebApp(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "linked"})
+}
+
+func (c *Controller) DeleteAccount(ctx *gin.Context) {
+	acc := c.requireAccount(ctx)
+	if acc == nil {
+		return
+	}
+	if ctx.PostForm("confirm") != "yes" {
+		ctx.Redirect(http.StatusSeeOther, "/account")
+		return
+	}
+	if err := c.Auth.DeleteAccount(acc); err != nil {
+		log.Default().Println("delete account failed:", err)
+		ctx.Redirect(http.StatusSeeOther, "/account")
+		return
+	}
+	auth.ClearSessionCookie(ctx, c.SecureCookies)
+	T := c.messages(c.WebLocalizer(ctx))
+	c.renderMessage(ctx, http.StatusOK, T["WebAccountDeleted"], "", "")
+}
+
+func (c *Controller) PrivacyPage(ctx *gin.Context) {
+	ctx.HTML(http.StatusOK, "privacy", gin.H{
+		"T":       c.messages(c.WebLocalizer(ctx)),
+		"Contact": c.PrivacyContact,
+	})
 }
 
 // ---- event viewer / settings ----

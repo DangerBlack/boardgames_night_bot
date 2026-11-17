@@ -55,3 +55,22 @@ func TestTemplatesRender(t *testing.T) {
 		}
 	}
 }
+
+func TestPrivacyAndAccountDeleteRender(t *testing.T) {
+	bundle := i18n.NewBundle(language.English)
+	tmpl := template.Must(template.New("").Funcs(TemplateFuncs(bundle)).ParseGlob("../../templates/*"))
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "privacy", map[string]any{"T": map[string]string{"WebPrivacyTitle": "Privacy"}, "Contact": "me@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "me@example.com") {
+		t.Fatal("contact missing")
+	}
+	buf.Reset()
+	if err := tmpl.ExecuteTemplate(&buf, "account", map[string]any{"State": "pending", "Next": "/account", "T": map[string]string{"WebDeleteAccountConfirm": `Sure? "x"`}}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "/account/delete") {
+		t.Fatal("delete form missing")
+	}
+}

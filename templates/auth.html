@@ -13,10 +13,10 @@
     button, .button { display: inline-block; padding: 10px 20px; background: #007bff; color: #fff; border: none; border-radius: 5px; font-size: 1em; cursor: pointer; text-decoration: none; }
     button:hover, .button:hover { background: #0056b3; }
     button.secondary { background: #6c757d; }
+    button.danger { background: #c0392b; }
     .choice { border: 1px solid #e3e3e8; border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
     .hidden { display: none; }
 </style>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 {{ end }}
 
 {{ define "login" }}
@@ -37,6 +37,7 @@
             <input type="hidden" name="next" value="{{ .Next }}">
             <button type="submit">{{ .T.WebSendLink }}</button>
         </form>
+        <p class="muted"><a href="/privacy">{{ .T.WebPrivacyTitle }}</a></p>
         {{ else }}
         <p class="error">{{ .T.WebEmailDisabled }}</p>
         {{ end }}
@@ -87,6 +88,7 @@
 <html>
 <head>
     {{ template "auth_head" }}
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <title>{{ .T.WebAccountTitle }}</title>
 </head>
 <body>
@@ -137,6 +139,12 @@
         <form action="/logout" method="post" style="margin-top: 24px">
             <button type="submit" class="secondary">{{ .T.WebSignOut }}</button>
         </form>
+        <form action="/account/delete" method="post" style="margin-top: 12px"
+            onsubmit="return confirm({{ .T.WebDeleteAccountConfirm }});">
+            <input type="hidden" name="confirm" value="yes">
+            <button type="submit" class="danger">{{ .T.WebDeleteAccount }}</button>
+        </form>
+        <p class="muted"><a href="/privacy">{{ .T.WebPrivacyTitle }}</a></p>
     </div>
     <script>
         (function () {
@@ -159,6 +167,27 @@
             });
         })();
     </script>
+</body>
+</html>
+{{ end }}
+
+{{ define "privacy" }}
+<!DOCTYPE html>
+<html>
+<head>
+    {{ template "auth_head" }}
+    <title>{{ .T.WebPrivacyTitle }}</title>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 {{ .T.WebPrivacyTitle }}</h1>
+        <p>{{ .T.WebPrivacyIntro }}</p>
+        <p>{{ .T.WebPrivacyData }}</p>
+        <p>{{ .T.WebPrivacyProcessors }}</p>
+        <p>{{ .T.WebPrivacyRetention }}</p>
+        <p>{{ .T.WebPrivacyRights }}</p>
+        {{ if .Contact }}<p>{{ .T.WebPrivacyContact }} {{ .Contact }}</p>{{ end }}
+    </div>
 </body>
 </html>
 {{ end }}

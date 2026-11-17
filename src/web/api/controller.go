@@ -43,10 +43,13 @@ type Controller struct {
 	Service        *Service
 	Limiter        *limiter.Limiter
 	LoginLimiter   *limiter.Limiter
+	SearchLimiter  *limiter.Limiter
 	Auth           *auth.Service
 	BotUsername    string
 	BaseURL        string
 	SecureCookies  bool
+	// PrivacyContact is shown on the privacy page (PRIVACY_CONTACT env).
+	PrivacyContact string
 }
 
 func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, LanguageBundle *i18n.Bundle, hook *hooks.WebhookClient, service *Service, authService *auth.Service, baseURL string) *Controller {
@@ -65,7 +68,9 @@ func NewController(router *gin.RouterGroup, db *database.Database, bgg bgg.BGGSe
 		Service:        service,
 		Limiter:        limiter.NewLimiter(5, 5),
 		// ~1 login email request every 10s per IP, burst of 3
-		LoginLimiter:  limiter.NewLimiterPerSecond(0.1, 3),
+		LoginLimiter: limiter.NewLimiterPerSecond(0.1, 3),
+		// autocomplete fires while typing: allow bursts, but protect the BGG token quota
+		SearchLimiter: limiter.NewLimiterPerSecond(2, 10),
 		Auth:          authService,
 		BotUsername:   botUsername,
 		BaseURL:       baseURL,
@@ -107,10 +112,12 @@ func (c *Controller) InjectRoute() {
 	web.POST("/logout", c.Logout)
 	web.GET("/account", c.AccountPage)
 	web.POST("/account/username", c.SetUsername)
-	web.POST("/account/link-telegram", c.LinkTelegramViaBot)
+	web.POST("/account/link-telegram", c.LoginLimiter.GinHandlerByClientIP(), c.LinkTelegramViaBot)
 	web.POST("/account/link-telegram-webapp", c.LinkTelegramViaWebApp)
+	web.POST("/account/delete", c.DeleteAccount)
+	web.GET("/privacy", c.PrivacyPage)
 
-	c.Router.GET("/bgg/search", c.BggSearch)
+	c.Router.GET("/bgg/search", c.SearchLimiter.GinHandlerByClientIP(), c.BggSearch)
 	c.Router.POST(
 		"/webhooks/:webhook_id",
 		c.Limiter.GinHandler(),

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,12 @@ func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *teleb
 	var err error
 	router := gin.Default()
 
+	if err = router.SetTrustedProxies(ParseTrustedProxies(os.Getenv("TRUSTED_PROXIES"))); err != nil {
+		log.Fatal("invalid TRUSTED_PROXIES: ", err)
+	}
+
 	router.Use(gin.Logger())
+	router.Use(SecurityHeaders(), LimitBody(MaxBodyBytes))
 
 	router.SetFuncMap(TemplateFuncs(bundle))
 
@@ -28,6 +34,7 @@ func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *teleb
 
 	controller := api.NewController(router.Group("/"), db, bgg, bot, bundle, hook, service, authService, baseURL)
 
+	controller.PrivacyContact = os.Getenv("PRIVACY_CONTACT")
 	controller.InjectRoute()
 
 	router.NoRoute(func(ctx *gin.Context) {

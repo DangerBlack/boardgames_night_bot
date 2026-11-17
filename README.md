@@ -39,6 +39,11 @@ To install the Boardgame Night Bot, follow these steps:
     EMAIL_FROM="Board Game Night <noreply@yourdomain.example>"
     # How long Telegram Mini App init data stays valid (default 24h)
     TELEGRAM_INIT_DATA_MAX_AGE=24h
+    # Reverse proxies allowed to set X-Forwarded-For (default: loopback and private ranges).
+    # Set it to your proxy (e.g. Cloudflare ranges) so per-IP rate limits see real client IPs.
+    TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12
+    # Shown on the /privacy page
+    PRIVACY_CONTACT=privacy@yourdomain.example
     ```
 
 > [!Note]
@@ -62,6 +67,8 @@ People can take part in events from the web, not only from Telegram:
 - **Sharing**: every event page has a share link (`BASE_URL/events/<id>`). By default only Telegram users can join. The event owner can tick *"Let people without Telegram join"*, either when creating the event or on the event page. A 🔗 share button then also appears in the Telegram message.
 
 Your Resend sending domain must be verified so that `EMAIL_FROM` is accepted.
+
+Users can delete their account from `/account`. For a separate account, its participations are deleted too. For a linked account, participations stay with the Telegram user. `/privacy` describes what is stored.
 
 ## Usage
 

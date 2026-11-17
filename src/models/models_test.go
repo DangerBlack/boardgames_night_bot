@@ -342,3 +342,29 @@ func mustParseTime(s string) time.Time {
 	}
 	return t
 }
+
+func TestFormatMsgEscapesUserText(t *testing.T) {
+	bundle := i18n.NewBundle(language.English)
+	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
+	bundle.MustLoadMessageFile("../../localization/active.en.toml")
+	localizer := i18n.NewLocalizer(bundle, "en")
+
+	loc := `<i>home</i>`
+	e := Event{
+		ID:       "e1",
+		Name:     `<a href="https://evil.example">Night</a>`,
+		UserName: "<b>x",
+		Location: &loc,
+		BoardGames: []BoardGame{{
+			ID: 1, Name: `Catan <a href="https://evil.example">`, MaxPlayers: 4,
+			Participants: []Participant{{UserID: -1, UserName: "<script>"}},
+		}},
+	}
+	msg, _ := e.FormatMsg(localizer, WebUrl{})
+	if strings.Contains(msg, "evil.example\">") || strings.Contains(msg, "<script>") || strings.Contains(msg, "<i>home") || strings.Contains(msg, "<b>x") {
+		t.Fatalf("user text not escaped:\n%s", msg)
+	}
+	if !strings.Contains(msg, "&lt;script&gt; "+ExternalUserMarker) {
+		t.Fatalf("expected escaped external participant, got:\n%s", msg)
+	}
+}
