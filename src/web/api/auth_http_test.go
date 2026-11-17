@@ -432,7 +432,7 @@ func TestAllAuthMessagesTranslated(t *testing.T) {
 	ids := append([]string{}, webMessageIDs...)
 	ids = append(ids, "EmailLoginSubject", "EmailLoginBody", "EmailLoginButton",
 		"LinkSuccess", "LinkFailed", "LinkTelegramTaken", "LinkPrivateOnly", "LinkOpenAccount",
-		"LinkConfirmQuestion", "LinkConfirmButton", "LinkCancelButton", "LinkCancelled", "ShareEvent")
+		"LinkConfirmQuestion", "LinkConfirmButton", "LinkCancelButton", "LinkCancelled")
 	for _, lang := range []string{"en", "it", "de"} {
 		mf, err := bundle.LoadMessageFile(fmt.Sprintf("../../../localization/active.%s.toml", lang))
 		if err != nil {

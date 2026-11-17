@@ -161,7 +161,6 @@ LinkFailed = "❌ Dieser Link ist ungültig oder abgelaufen. Erstelle einen neue
 LinkTelegramTaken = "❌ Dieses Telegram-Konto ist bereits mit einer anderen E-Mail verknüpft."
 LinkPrivateOnly = "Bitte öffne diesen Link in einem privaten Chat mit dem Bot."
 LinkOpenAccount = "Mein Konto öffnen"
-ShareEvent = "🔗 Link teilen"
 WebPrivacyTitle = "Datenschutz"
 WebPrivacyIntro = "Board Game Night hilft Gruppen, Spieleabende zu organisieren. Das speichern wir über dich und warum."
 WebPrivacyData = "Was wir speichern: deine E-Mail-Adresse (nur um dir Anmeldelinks zu senden), den gewählten Benutzernamen oder das verknüpfte Telegram-Konto (ID und Name), die Events und Spiele, denen du beitrittst, und ein Sitzungscookie, das dich angemeldet hält. Es gibt keine Tracking- oder Werbecookies."

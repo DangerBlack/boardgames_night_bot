@@ -160,7 +160,6 @@ LinkFailed = "❌ This link is invalid or has expired. Create a new one from the
 LinkTelegramTaken = "❌ This Telegram account is already linked to another email."
 LinkPrivateOnly = "Please open this link in a private chat with the bot."
 LinkOpenAccount = "Open my account"
-ShareEvent = "🔗 Share link"
 WebPrivacyTitle = "Privacy"
 WebPrivacyIntro = "Board Game Night helps groups organise board game evenings. This is what it stores about you and why."
 WebPrivacyData = "What we store: your email address (only to send you sign-in links), the username you choose or the Telegram account you link (ID and name), the events and games you join, and a session cookie that keeps you signed in. There are no tracking or advertising cookies."
