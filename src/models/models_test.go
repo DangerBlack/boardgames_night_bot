@@ -368,3 +368,26 @@ func TestFormatMsgEscapesUserText(t *testing.T) {
 		t.Fatalf("expected escaped external participant, got:\n%s", msg)
 	}
 }
+
+func TestFormatMsgShareLinkInText(t *testing.T) {
+	localizer := setupLocalizer()
+	web := WebUrl{BaseUrl: "https://bgn.example/", BotMiniAppURL: "https://t.me/bot/app"}
+	e := Event{ID: "e1", Name: "Night", AllowExternal: true}
+
+	msg, markup := e.FormatMsg(localizer, web)
+	if !strings.Contains(msg, `🔗 <a href="https://bgn.example/events/e1">Event link</a>`) {
+		t.Fatalf("expected share link in text, got:\n%s", msg)
+	}
+	for _, row := range markup.InlineKeyboard {
+		for _, b := range row {
+			if strings.Contains(b.URL, "/events/e1") || strings.Contains(b.URL, "t.me/share") {
+				t.Fatalf("share link should not be a button: %+v", b)
+			}
+		}
+	}
+
+	e.AllowExternal = false
+	if msg, _ := e.FormatMsg(localizer, web); strings.Contains(msg, "/events/e1") {
+		t.Fatalf("closed event must not show the share link:\n%s", msg)
+	}
+}

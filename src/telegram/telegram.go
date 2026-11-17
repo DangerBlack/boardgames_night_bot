@@ -141,8 +141,12 @@ func (t Telegram) Start(c telebot.Context) error {
 	var err error
 	args := c.Args()
 
+	// SendOptions replaces any option passed before it (including the
+	// bot-wide parse mode), so set the parse mode here and always pass opts
+	// before the reply markup.
 	opts := &telebot.SendOptions{
-		ThreadID: c.Message().ThreadID,
+		ThreadID:  c.Message().ThreadID,
+		ParseMode: telebot.ModeHTML,
 	}
 
 	if len(args) < 1 {
@@ -187,7 +191,7 @@ func (t Telegram) Start(c telebot.Context) error {
 			"Name": models.EscapeHTML(event.Name),
 		},
 	})
-	return c.Send(openT, markup, opts)
+	return c.Send(openT, opts, markup)
 }
 
 // LinkAccount handles /start link_<token>. It never links directly: it shows
@@ -235,7 +239,7 @@ func (t Telegram) LinkAccount(c telebot.Context, payload string, opts *telebot.S
 			Data:   pending.Token,
 		},
 	}}
-	return c.Send(question, markup, opts)
+	return c.Send(question, opts, markup)
 }
 
 // CallbackConfirmLink handles the Confirm/Cancel buttons of the link prompt.

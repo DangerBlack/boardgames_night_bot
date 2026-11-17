@@ -268,7 +268,13 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 	if e.Location != nil && *e.Location != "" {
 		msg += "📍 <b>" + EscapeHTML(*e.Location) + "</b>\n"
 	}
-	if e.Location != nil || e.StartsAt != nil {
+	// When people outside Telegram may join, put the public link in the text
+	// rather than in a button, so it survives forwarding.
+	if e.AllowExternal && webUrl.BaseUrl != "" {
+		label := localizer.MustLocalizeMessage(&i18n.Message{ID: "EventLink"})
+		msg += fmt.Sprintf("🔗 <a href=\"%s\">%s</a>\n", EscapeHTML(e.ShareURL(webUrl.BaseUrl)), EscapeHTML(label))
+	}
+	if e.Location != nil || e.StartsAt != nil || (e.AllowExternal && webUrl.BaseUrl != "") {
 		msg += "\n"
 	}
 	for _, bg := range e.BoardGames {
@@ -308,14 +314,6 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 		URL:  fmt.Sprintf("%s?startapp=%s", webUrl.BotMiniAppURL, e.ID),
 	}
 	btns = append(btns, btn2)
-
-	// When people outside Telegram may join, offer a ready-made share link.
-	if e.AllowExternal && webUrl.BaseUrl != "" {
-		btns = append(btns, telebot.InlineButton{
-			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "ShareEvent"}),
-			URL:  "https://t.me/share/url?url=" + url.QueryEscape(e.ShareURL(webUrl.BaseUrl)),
-		})
-	}
 
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{}
