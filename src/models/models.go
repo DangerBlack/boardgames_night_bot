@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,12 +28,16 @@ type Event struct {
 	Locked     bool
 	Location   *string
 	StartsAt   *time.Time
+	// AllowExternal lets people without a Telegram identity (email-only,
+	// "separated" accounts) join and edit the event from the web.
+	AllowExternal bool
 }
 
 type AddPlayerRequest struct {
-	GameID             int64  `json:"game_id" binding:"required"`
-	UserID             int64  `json:"user_id" binding:"required"`
-	UserName           string `json:"user_name" binding:"required"`
+	GameID int64 `json:"game_id" binding:"required"`
+	// Deprecated: identity is resolved server-side; these are ignored by the web API.
+	UserID             int64  `json:"user_id"`
+	UserName           string `json:"user_name"`
 	IsTelegramUsername bool   `json:"is_telegram_username"`
 }
 
@@ -50,15 +55,17 @@ type BoardGame struct {
 }
 
 type CreateEventRequest struct {
-	ChatID           int64      `json:"chat_id" form:"chat_id" binding:"required"`
-	ThreadID         *int64     `json:"thread_id" form:"thread_id"`
-	Name             string     `json:"name" form:"name" binding:"required"`
-	Location         *string    `json:"location" form:"location"`
-	StartsAt         *time.Time `json:"starts_at" form:"starts_at" time_format:"2006-01-02T15:04"`
-	UserID           int64      `json:"user_id" form:"user_id" binding:"required"`
-	UserName         string     `json:"user_name" form:"user_name" binding:"required"`
-	IsLocked         BoolOn     `json:"is_locked" form:"is_locked"`
-	AllowGeneralJoin BoolOn     `json:"allow_general_join" form:"allow_general_join"`
+	ChatID   int64      `json:"chat_id" form:"chat_id" binding:"required"`
+	ThreadID *int64     `json:"thread_id" form:"thread_id"`
+	Name     string     `json:"name" form:"name" binding:"required"`
+	Location *string    `json:"location" form:"location"`
+	StartsAt *time.Time `json:"starts_at" form:"starts_at" time_format:"2006-01-02T15:04"`
+	// Deprecated: identity is resolved server-side; these are ignored by the web API.
+	UserID           int64  `json:"user_id" form:"user_id"`
+	UserName         string `json:"user_name" form:"user_name"`
+	IsLocked         BoolOn `json:"is_locked" form:"is_locked"`
+	AllowGeneralJoin BoolOn `json:"allow_general_join" form:"allow_general_join"`
+	AllowExternal    BoolOn `json:"allow_external" form:"allow_external"`
 }
 
 // BoolOn is a custom bool type that parses "on" as true (for HTML form checkboxes)
@@ -107,6 +114,22 @@ type Participant struct {
 	UserName           string     `json:"user_name"`
 	IsTelegramUsername bool       `json:"is_telegram_username"`
 	CreatedAt          *time.Time `json:"created_at,omitempty"`
+}
+
+// IsExternal reports whether the participant joined with a web-only
+// ("separated") account. Such accounts use negative user IDs so they can never
+// collide with Telegram user IDs, which are always positive.
+func (p Participant) IsExternal() bool {
+	return IsExternalUserID(p.UserID)
+}
+
+// ExternalUserMarker is appended to the display name of web-only participants
+// so that Telegram users can tell them apart from Telegram accounts.
+const ExternalUserMarker = "✉️"
+
+// IsExternalUserID reports whether userID belongs to a web-only account.
+func IsExternalUserID(userID int64) bool {
+	return userID < 0
 }
 
 // create enum with value add_player
@@ -186,6 +209,9 @@ func (e Event) FormatBG(localizer *i18n.Localizer, url WebUrl, bg BoardGame) (st
 		if p.IsTelegramUsername {
 			msg += " - @" + display + "\n"
 			continue
+		}
+		if p.IsExternal() {
+			display += " " + ExternalUserMarker
 		}
 		msg += " - " + display + "\n"
 	}
@@ -279,6 +305,14 @@ func (e Event) FormatMsg(localizer *i18n.Localizer, webUrl WebUrl) (string, *tel
 	}
 	btns = append(btns, btn2)
 
+	// When people outside Telegram may join, offer a ready-made share link.
+	if e.AllowExternal && webUrl.BaseUrl != "" {
+		btns = append(btns, telebot.InlineButton{
+			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "ShareEvent"}),
+			URL:  "https://t.me/share/url?url=" + url.QueryEscape(e.ShareURL(webUrl.BaseUrl)),
+		})
+	}
+
 	markup := &telebot.ReplyMarkup{}
 	markup.InlineKeyboard = [][]telebot.InlineButton{}
 	for _, btn := range btns {
@@ -316,6 +350,13 @@ func ExtractBoardGameID(inputURL string) (int64, bool) {
 func IsValidUUID(u string) bool {
 	_, err := uuid.Parse(u)
 	return err == nil
+}
+
+// ShareURL is the public web link to the event. It works outside Telegram:
+// visitors can sign in with email (when AllowExternal is set) or open the
+// Telegram mini-app from there.
+func (e Event) ShareURL(baseURL string) string {
+	return strings.TrimRight(baseURL, "/") + "/events/" + e.ID
 }
 
 func (e Event) FormatStartAt() *string {
