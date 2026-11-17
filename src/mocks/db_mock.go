@@ -7,16 +7,17 @@ import (
 )
 
 type MockDatabase struct {
-	InsertEventFunc                        func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
-	InsertEventWithOptionalGameFunc        func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error)
-	InsertBoardGameFunc                    func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
-	UpdateBoardGameBGGInfoByIDFunc func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
-	UpdateEventMessageIDFunc       func(eventID string, messageID int64) error
-	DeleteBoardGameByIDFunc        func(ID string) error
-	SelectEventByEventIDFunc       func(eventID string) (*models.Event, error)
-	DeleteEventFunc                func(id string) error
-	InsertParticipantFunc          func(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error)
-	RemoveParticipantFunc          func(eventID string, userID int64) (string, int64, error)
+	InsertEventFunc                 func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
+	InsertEventWithOptionalGameFunc func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error)
+	InsertBoardGameFunc             func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	UpdateBoardGameBGGInfoByIDFunc  func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
+	UpdateEventMessageIDFunc        func(eventID string, messageID int64) error
+	DeleteBoardGameByIDFunc         func(ID string) error
+	SelectEventByEventIDFunc        func(eventID string) (*models.Event, error)
+	DeleteEventFunc                 func(id string) error
+	InsertParticipantFunc           func(id *string, eventID string, boardgameID, userID int64, userName string, isTelegramUsername bool) (string, error)
+	RemoveParticipantFunc           func(eventID string, userID int64) (string, int64, error)
+	SetEventAllowExternalFunc       func(eventID string, allow bool) error
 }
 
 func NewMockDatabase() *MockDatabase {
@@ -141,6 +142,13 @@ func (m *MockDatabase) GetWebhooksByChatID(chatID int64) ([]models.Webhook, erro
 
 func (m *MockDatabase) GetWebhookByWebhookID(webhookID string) (*models.Webhook, error) {
 	return &models.Webhook{ID: 1, UUID: "mock-webhook-uuid", ChatID: 123, Url: "mock-url", Secret: "mock-secret"}, nil
+}
+
+func (m *MockDatabase) SetEventAllowExternal(eventID string, allow bool) error {
+	if m.SetEventAllowExternalFunc != nil {
+		return m.SetEventAllowExternalFunc(eventID, allow)
+	}
+	return nil
 }
 
 var _ database.DatabaseService = &MockDatabase{}

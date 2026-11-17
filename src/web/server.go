@@ -1,6 +1,7 @@
 package web
 
 import (
+	"boardgame-night-bot/src/auth"
 	"boardgame-night-bot/src/bgg"
 	"boardgame-night-bot/src/database"
 	"boardgame-night-bot/src/hooks"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -15,14 +17,38 @@ import (
 	"gopkg.in/telebot.v3"
 )
 
-func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, bundle *i18n.Bundle, hook *hooks.WebhookClient, service *api.Service) {
+func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *telebot.Bot, bundle *i18n.Bundle, hook *hooks.WebhookClient, service *api.Service, authService *auth.Service, baseURL string) {
 	var err error
 	router := gin.Default()
 
-	router.Use(gin.Logger())
+	if err = router.SetTrustedProxies(ParseTrustedProxies(os.Getenv("TRUSTED_PROXIES"))); err != nil {
+		log.Fatal("invalid TRUSTED_PROXIES: ", err)
+	}
 
-	// Add custom template functions
-	router.SetFuncMap(template.FuncMap{
+	router.Use(gin.Logger())
+	router.Use(SecurityHeaders(), LimitBody(MaxBodyBytes))
+
+	router.SetFuncMap(TemplateFuncs(bundle))
+
+	router.LoadHTMLGlob("templates/*")
+
+	controller := api.NewController(router.Group("/"), db, bgg, bot, bundle, hook, service, authService, baseURL)
+
+	controller.PrivacyContact = os.Getenv("PRIVACY_CONTACT")
+	controller.InjectRoute()
+
+	router.NoRoute(func(ctx *gin.Context) {
+		controller.NoRoute(ctx)
+	})
+
+	if err = router.Run(fmt.Sprintf(":%d", port)); err != nil {
+		panic(err)
+	}
+}
+
+// TemplateFuncs are the helpers available to the HTML templates.
+func TemplateFuncs(bundle *i18n.Bundle) template.FuncMap {
+	return template.FuncMap{
 		"int": func(v any) int {
 			switch val := v.(type) {
 			case int:
@@ -65,19 +91,5 @@ func StartServer(port int, db *database.Database, bgg bgg.BGGService, bot *teleb
 				},
 			})
 		},
-	})
-
-	router.LoadHTMLGlob("templates/*")
-
-	controller := api.NewController(router.Group("/"), db, bgg, bot, bundle, hook, service)
-
-	controller.InjectRoute()
-
-	router.NoRoute(func(ctx *gin.Context) {
-		controller.NoRoute(ctx)
-	})
-
-	if err = router.Run(fmt.Sprintf(":%d", port)); err != nil {
-		panic(err)
 	}
 }

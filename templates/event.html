@@ -202,6 +202,44 @@
             margin: 0 auto;
             text-align: center;
         }
+
+        .viewer-box {
+            max-width: 600px;
+            margin: 16px auto;
+            padding: 12px 16px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+
+        .viewer-box .link-button {
+            display: inline-block;
+            margin: 4px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .viewer-box .link-button.secondary { background: #6c757d; }
+
+        .share-url {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 13px;
+            margin: 6px 0;
+        }
+
+        .muted { color: #666; font-size: 0.9em; }
+        .hidden { display: none !important; }
     </style>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -262,24 +300,47 @@
                     {{ if $isQueued }}
                         {{ $displayName = printf "%s %s" $participant.UserName (queuedText $queueNum $.QueuedLang) }}
                     {{ end }}
-                    <p>- {{ $displayName }}</p>
+                    <p>- {{ $displayName }}{{ if lt $participant.UserID 0 }} {{ $.ExternalMarker }}{{ end }}</p>
                     {{ end }}
                     {{ else }}
                     <p>- {{ $noParticipants }}</p>
                     {{ end }}
                 </div>
                 <div class="left-button">
-                    <button class="edit" value="{{ .ID }}"
+                    <button class="edit needs-actor hidden" value="{{ .ID }}"
                         onclick="window.location='{{ $eventID }}/games/{{ .ID }}'">🔧</button>
-                    <button class="join" value="{{ .ID }}">{{ $join }}</button>
+                    <button class="join needs-actor hidden" value="{{ .ID }}">{{ $join }}</button>
                 </div>
             </div>
         </div>
         {{ end }}
     </div>
 
-    <div id="auth">
-        <p>{{ .Welcome }} <span id="username"></span></p>
+    <div class="viewer-box">
+        <!-- Filled in from /events/:id/viewer: the server decides who the visitor is. -->
+        <p id="viewer-identity" class="hidden">{{ .Welcome }} <b id="username"></b>
+            <a href="/account" id="account-link" class="hidden">👤</a></p>
+        <p id="viewer-external-blocked" class="muted hidden">{{ .T.WebExternalNotAllowed }}</p>
+        <div id="viewer-login" class="hidden">
+            <a class="link-button" href="{{ .MiniAppURL }}">📱 {{ .T.WebOpenInTelegram }}</a>
+            <a class="link-button secondary hidden" id="email-login" href="/login?next=/events/{{ .Id }}">✉️ {{ .T.WebSignInWithEmail }}</a>
+        </div>
+        <p id="viewer-pending" class="hidden"><a class="link-button" href="/account?next=/events/{{ .Id }}">{{ .T.WebFinishAccountSetup }}</a></p>
+        <button id="leave" class="link-button secondary needs-actor hidden">🚫 {{ .T.WebLeaveEvent }}</button>
+        <div id="owner-settings" class="hidden">
+            <label><input type="checkbox" id="allow-external"> {{ .T.WebAllowExternal }}</label>
+        </div>
+    </div>
+
+    <div class="viewer-box">
+        <h3>🔗 {{ .T.WebShareEvent }}</h3>
+        <input class="share-url" id="share-url" type="text" value="{{ .ShareURL }}" readonly>
+        <button class="link-button" id="share-button">{{ .T.WebShareEvent }}</button>
+        <button class="link-button secondary" id="copy-button">{{ .T.WebCopyLink }}</button>
+        <p class="muted">{{ .T.WebShareHint }}</p>
+    </div>
+
+    <div id="auth" class="hidden">
         <div class="add-game">
             <h3>{{ .AddNewGame }}</h3>
             <form action="{{ .Id }}/add-game" method="post" autocomplete="off">
@@ -288,65 +349,104 @@
                 <div id="autocomplete-list" class="autocomplete-items" style="position:relative;z-index:10;"></div>
                 <input type="text" id="bggUrlInput" name="bgg_url" placeholder="BGG URL">
                 <input type="number" name="max_players" placeholder="{{ .MaxPlayers }}">
-                <input type="text" name="user_id" placeholder="Your username" id="userID" required hidden>
+                <input type="hidden" name="tg_init_data" class="tg-init-data">
                 <button type="submit">{{ .AddGame }}</button>
             </form>
         </div>
     </div>
     <p class="updated">{{ .UpdatedAt }}</p>
     <script>
-        var user = window?.Telegram?.WebApp?.initDataUnsafe?.user;
-        if (user) {
-            document.getElementById("username").innerText = user.username || `${user.first_name} ${user.last_name}`;
-            document.getElementById("userID").value = user.id;
+        var webApp = window?.Telegram?.WebApp;
+        var initData = (webApp && webApp.initData) || "";
+        var authHeaders = initData ? { "X-Telegram-Init-Data": initData } : {};
+        document.querySelectorAll(".tg-init-data").forEach(function (el) { el.value = initData; });
+
+        function show(id) { var el = document.getElementById(id); if (el) el.classList.remove("hidden"); }
+
+        fetch("{{ .Id }}/viewer", { headers: authHeaders, credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (v) {
+                if (!v.authenticated) {
+                    if (v.account_state === "pending") { show("viewer-pending"); return; }
+                    show("viewer-login");
+                    if (v.allow_external && v.email_enabled) show("email-login");
+                    return;
+                }
+                document.getElementById("username").innerText = v.display_name + (v.external ? " {{ .ExternalMarker }}" : "");
+                show("viewer-identity");
+                if (!v.via_telegram) show("account-link");
+                if (!v.can_act) { show("viewer-external-blocked"); return; }
+                document.querySelectorAll(".needs-actor").forEach(function (el) { el.classList.remove("hidden"); });
+                show("auth");
+                if (v.is_owner) {
+                    var cb = document.getElementById("allow-external");
+                    cb.checked = !!v.allow_external;
+                    show("owner-settings");
+                    cb.addEventListener("change", function () {
+                        fetch("{{ .Id }}/settings", {
+                            method: "POST",
+                            headers: Object.assign({ "Content-Type": "application/json" }, authHeaders),
+                            body: JSON.stringify({ allow_external: cb.checked }),
+                        }).then(function (r) { if (!r.ok) { cb.checked = !cb.checked; } });
+                    });
+                }
+            })
+            .catch(function (err) { console.error("viewer:", err); show("viewer-login"); });
+
+        // Share: Telegram share sheet inside the mini-app, native share sheet
+        // on mobile browsers, clipboard otherwise.
+        var shareUrl = document.getElementById("share-url").value;
+        var shareTitle = {{ .Title }};
+        function copyLink() {
+            var done = function () { alert("{{ .T.WebLinkCopied }}"); };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(shareUrl).then(done);
+            } else {
+                var input = document.getElementById("share-url");
+                input.select();
+                document.execCommand("copy");
+                done();
+            }
         }
-        else {
-            document.getElementById("username").innerText = "guest";
-            document.getElementById("auth").setAttribute("style", "display: none;");
-            document.querySelectorAll(".join").forEach(button => {
-                button.setAttribute("style", "display: none;");
-            });
-        }
+        document.getElementById("copy-button").addEventListener("click", copyLink);
+        document.getElementById("share-button").addEventListener("click", function () {
+            if (initData && webApp.openTelegramLink) {
+                webApp.openTelegramLink("https://t.me/share/url?url=" + encodeURIComponent(shareUrl) + "&text=" + encodeURIComponent(shareTitle));
+            } else if (navigator.share) {
+                navigator.share({ title: shareTitle, url: shareUrl }).catch(function () { });
+            } else {
+                copyLink();
+            }
+        });
 
         document.querySelectorAll(".swap-image").forEach(img => {
             img.setAttribute("src", img.getAttribute("custom"));
         });
 
+        function postJSON(path, body) {
+            return fetch(path, {
+                method: "POST",
+                headers: Object.assign({ "Content-Type": "application/json" }, authHeaders),
+                credentials: "same-origin",
+                body: JSON.stringify(body || {}),
+            }).then(function (response) {
+                return response.json().then(function (data) {
+                    if (!response.ok) throw new Error(data.error || "Request failed");
+                    return data;
+                });
+            });
+        }
+
+        document.getElementById("leave").addEventListener("click", function () {
+            postJSON("{{ .Id }}/leave").then(function () { location.reload(); }).catch(function (e) { alert(e.message); });
+        });
+
         document.querySelectorAll(".join").forEach(button => {
             button.addEventListener("click", function (event) {
                 const game_id = parseInt(event.target.getAttribute("value"), 10);
-
-                if (!user) {
-                    alert("Please login to join a game");
-                    return;
-                }
-
-                const is_telegram_username = !!user.username;
-                fetch("{{ .Id }}/join", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        game_id,
-                        user_id: user.id,
-                        user_name: user.username || `${user.first_name} ${user.last_name}`,
-                        is_telegram_username,
-                    })
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error("Network response was not ok");
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Success:", data);
-                        location.reload(); // Reload the page after successful request
-                    })
-                    .catch(error => {
-                        console.error("Error:", error);
-                    });
+                postJSON("{{ .Id }}/join", { game_id })
+                    .then(function () { location.reload(); })
+                    .catch(function (e) { alert(e.message); });
             });
         });
 

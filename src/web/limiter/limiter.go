@@ -32,6 +32,11 @@ type Limiter struct {
 }
 
 func NewLimiter(rps int, burst int) *Limiter {
+	return NewLimiterPerSecond(float64(rps), burst)
+}
+
+// NewLimiterPerSecond allows fractional rates, e.g. 0.1 = one request every 10s.
+func NewLimiterPerSecond(rps float64, burst int) *Limiter {
 	l := &Limiter{
 		limit:    rate.Limit(rps),
 		burst:    burst,
@@ -81,6 +86,17 @@ func (l *Limiter) GinHandler() gin.HandlerFunc {
 		limiter := l.getLimiter(webhookID)
 		if !limiter.Allow() {
 			c.AbortWithStatusJSON(429, gin.H{"error": "rate limit exceeded for webhook_id"})
+			return
+		}
+		c.Next()
+	}
+}
+
+// GinHandlerByClientIP limits requests per client IP (used for login endpoints).
+func (l *Limiter) GinHandlerByClientIP() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !l.getLimiter("ip:" + c.ClientIP()).Allow() {
+			c.AbortWithStatusJSON(429, gin.H{"error": "rate limit exceeded"})
 			return
 		}
 		c.Next()

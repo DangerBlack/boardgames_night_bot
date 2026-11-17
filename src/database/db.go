@@ -43,12 +43,22 @@ type DatabaseService interface {
 	RemoveWebhook(webhookID int64) error
 	GetWebhooksByChatID(chatID int64) ([]models.Webhook, error)
 	GetWebhookByWebhookID(webhookID string) (*models.Webhook, error)
+	SetEventAllowExternal(eventID string, allow bool) error
 }
 
 var ErrNoRows = errors.New("sql: no rows in result set")
 
+// sqliteDSNOptions applies to every pooled connection (a PRAGMA run through
+// db.Exec would only reach one of them):
+//   - foreign keys: SQLite ships with them off, so ON DELETE CASCADE never ran
+//     and deleted events left their games and participants behind;
+//   - busy timeout: the bot and the web server write concurrently; wait for
+//     the lock instead of failing with "database is locked";
+//   - WAL: readers no longer block the writer.
+const sqliteDSNOptions = "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL"
+
 func NewDatabase(path string) *Database {
-	db, err := sql.Open("sqlite3", filepath.Join(path, "bot_data.sqlite"))
+	db, err := sql.Open("sqlite3", filepath.Join(path, "bot_data.sqlite")+sqliteDSNOptions)
 	if err != nil {
 		log.Fatal("failed to open database '"+filepath.Join(path, "bot_data.sqlite")+"':", err)
 	}
@@ -430,6 +440,7 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	e.user_name,
 	e.starts_at,
 	e.location,
+	e.allow_external,
 	b.id,
 	b.uuid,
 	b.name,
@@ -463,6 +474,7 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	e.user_name,
 	e.starts_at,
 	e.location,
+	e.allow_external,
 	b.id,
 	b.uuid,
 	b.name,
@@ -503,7 +515,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID pgtype.Int8
 		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
 		var startsAt, participantCreatedAt pgtype.Timestamp
-		var isTelegramUsername pgtype.Bool
+		var isTelegramUsername, allowExternal pgtype.Bool
 
 		if err := rows.Scan(
 			&event.ID,
@@ -514,6 +526,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&event.UserName,
 			&startsAt,
 			&location,
+			&allowExternal,
 			&boardGameID,
 			&boardGameUUID,
 			&boardGameName,
@@ -537,6 +550,7 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		event.Locked = strings.Contains(event.Name, "🔒")
 		event.StartsAt = TimeOrNil(startsAt)
 		event.Location = StringOrNil(location)
+		event.AllowExternal = allowExternal.Valid && allowExternal.Bool
 
 		if IntOrNil(boardGameID) != nil {
 			boardGame = models.BoardGame{

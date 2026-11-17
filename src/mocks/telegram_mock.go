@@ -12,6 +12,8 @@ type MockTelegramService struct {
 	SendFunc   func(to telebot.Recipient, what interface{}, opts ...interface{}) (*telebot.Message, error)
 	EditFunc   func(msg telebot.Editable, what interface{}, opts ...interface{}) (*telebot.Message, error)
 	DeleteFunc func(msg telebot.Editable) error
+
+	ChatMemberOfFunc func(chat telebot.Recipient, user telebot.Recipient) (*telebot.ChatMember, error)
 }
 
 func NewMockTelegramService() *MockTelegramService {
@@ -59,6 +61,9 @@ func (m *MockTelegramService) ChatByUsername(name string) (*telebot.Chat, error)
 }
 
 func (m *MockTelegramService) ChatMemberOf(chat telebot.Recipient, user telebot.Recipient) (*telebot.ChatMember, error) {
+	if m.ChatMemberOfFunc != nil {
+		return m.ChatMemberOfFunc(chat, user)
+	}
 	return &telebot.ChatMember{}, nil
 }
 

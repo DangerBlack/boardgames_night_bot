@@ -34,6 +34,18 @@ To install the Boardgame Night Bot, follow these steps:
     HTTP_MAX_ATTEMPT=3
     FAILURE_EXPIRATION=10m
     MAX_FAILURE_ATTEMPTS=5
+    # Email registration (optional: without these, email sign-in is disabled)
+    RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+    EMAIL_FROM="Board Game Night <noreply@yourdomain.example>"
+    # How long Telegram Mini App init data stays valid (default 24h)
+    TELEGRAM_INIT_DATA_MAX_AGE=24h
+    # Reverse proxies allowed to set X-Forwarded-For (default: loopback and private ranges).
+    # Set it to your proxy (e.g. Cloudflare ranges) so per-IP rate limits see real client IPs.
+    TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12
+    # Shown on the /privacy page
+    PRIVACY_CONTACT=privacy@yourdomain.example
+    # Let webhooks target private/loopback addresses (local testing only)
+    ALLOW_LOCAL_WEBHOOKS=false
     ```
 
 > [!Note]
@@ -45,6 +57,20 @@ To install the Boardgame Night Bot, follow these steps:
 > _Now please choose a short name for your web app: 3-30 characters, `a-zA-Z0-9_`_
 >
 > chose `home`
+
+## Web accounts and sharing
+
+People can take part in events from the web, not only from Telegram:
+
+- **Identity is verified server-side.** Inside the Telegram mini-app the page sends Telegram's signed `initData`, which the server checks with the bot `TOKEN`. Outside Telegram, visitors sign in with a one-time email link (sent through [Resend](https://resend.com)).
+- **After the first sign-in by email**, the user chooses:
+  - **Link Telegram** (claim): the bot deep link `/start link_<token>` proves which Telegram account is theirs. From then on they act as that Telegram user everywhere.
+  - **Separate account**: they choose a username and are marked as separate from Telegram. They are shown with ✉️, and they can still link Telegram later. When they do, their participations move to the Telegram account.
+- **Sharing**: every event page has a share link (`BASE_URL/events/<id>`). By default only Telegram users can join. The event owner can tick *"Let people without Telegram join"*, either when creating the event or on the event page. A 🔗 share button then also appears in the Telegram message.
+
+Your Resend sending domain must be verified so that `EMAIL_FROM` is accepted.
+
+Users can delete their account from `/account`. For a separate account, its participations are deleted too. For a linked account, participations stay with the Telegram user. `/privacy` describes what is stored.
 
 ## Usage
 
@@ -67,6 +93,10 @@ ngrok http 8080
 docker build -t boardgames-night-bot .
 docker run --env-file .env -p 8080:8080 -v ./archive:/archive boardgames-night-bot
 ```
+
+The container starts as root only to `chown` the data directory (`DB_PATH`, default `/archive`), then runs the bot as the unprivileged user `bot` (uid 10001). Existing volumes are fixed automatically on the first start. On the host, `./archive` will then be owned by uid 10001.
+
+The SQLite database runs in WAL mode, so back up `bot_data.sqlite` together with its `-wal`/`-shm` files, or use `sqlite3 bot_data.sqlite ".backup out.sqlite"`.
 
 ## Docker push
 ```
