@@ -56,6 +56,8 @@
 <body>
     <div class="container">
         <h1>🎲 {{ .T.WebVerifyTitle }}</h1>
+        <p>{{ .T.WebSigningInAs }} <b>{{ .Email }}</b></p>
+        <p class="muted">{{ .T.WebNotYourEmail }}</p>
         <form action="/auth/verify" method="post">
             <input type="hidden" name="token" value="{{ .Token }}">
             <input type="hidden" name="next" value="{{ .Next }}">
@@ -156,6 +158,9 @@
             document.getElementById("tg-name").innerText = u.username ? "@" + u.username : [u.first_name, u.last_name].filter(Boolean).join(" ");
             box.classList.remove("hidden");
             document.getElementById("link-webapp-button").addEventListener("click", function () {
+                // Make the target account explicit: guards against having been
+                // signed into someone else's account via a forwarded login link.
+                if (!confirm({{ .T.WebLinkConfirm }} + "\n\n" + {{ .EmailText }})) return;
                 fetch("/account/link-telegram-webapp", { method: "POST", headers: { "X-Telegram-Init-Data": wa.initData } })
                     .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
                     .then(function (res) {

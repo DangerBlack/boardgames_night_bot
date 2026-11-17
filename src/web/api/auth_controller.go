@@ -34,6 +34,7 @@ var webMessageIDs = []string{
 	"WebAllowExternal", "WebExternalNotAllowed", "WebLeaveEvent", "WebBack",
 	"WebPrivacyTitle", "WebPrivacyIntro", "WebPrivacyData", "WebPrivacyProcessors", "WebPrivacyRetention",
 	"WebPrivacyRights", "WebPrivacyContact", "WebDeleteAccount", "WebDeleteAccountConfirm", "WebAccountDeleted",
+	"WebSigningInAs", "WebNotYourEmail", "WebLinkConfirm",
 }
 
 func (c *Controller) messages(localizer *i18n.Localizer) map[string]string {
@@ -118,11 +119,22 @@ func (c *Controller) Login(ctx *gin.Context) {
 
 // VerifyPage only shows a confirmation button: mail scanners prefetch GET
 // links, and consuming the token on GET would burn it before the user clicks.
+//
+// It also shows which email will be signed in: someone can send you a login
+// link for THEIR account (login CSRF) hoping you then link your Telegram to it.
 func (c *Controller) VerifyPage(ctx *gin.Context) {
+	T := c.messages(c.WebLocalizer(ctx))
+	next := auth.SafeNext(ctx.Query("next"))
+	email, err := c.Auth.LoginTokenEmail(ctx.Query("token"))
+	if err != nil {
+		c.renderMessage(ctx, http.StatusBadRequest, T["WebVerifyTitle"], T["WebLinkExpired"], "/login?next="+url.QueryEscape(next))
+		return
+	}
 	ctx.HTML(http.StatusOK, "verify", gin.H{
 		"Token": ctx.Query("token"),
-		"Next":  auth.SafeNext(ctx.Query("next")),
-		"T":     c.messages(c.WebLocalizer(ctx)),
+		"Email": email,
+		"Next":  next,
+		"T":     T,
 	})
 }
 
@@ -186,12 +198,20 @@ func (c *Controller) renderAccount(ctx *gin.Context, status int, acc *models.Use
 	ctx.HTML(status, "account", gin.H{
 		"T":            T,
 		"Email":        acc.Email,
+		"EmailText":    derefString(acc.Email),
 		"State":        string(acc.State()),
 		"Username":     acc.Username,
 		"TelegramName": acc.TelegramName,
 		"Next":         auth.SafeNext(ctx.Query("next")),
 		"Error":        errMsg,
 	})
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func (c *Controller) SetUsername(ctx *gin.Context) {

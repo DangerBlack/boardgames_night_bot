@@ -110,6 +110,10 @@ func (t Telegram) SetupHandlers() {
 			return t.CallbackRemovePlayer(c)
 		case string(models.Unregister):
 			return t.CallbackUnregisterWebhook(c)
+		case string(models.LinkConfirm):
+			return t.CallbackConfirmLink(c, true)
+		case string(models.LinkCancel):
+			return t.CallbackConfirmLink(c, false)
 		}
 
 		return c.Reply("invalid action")
@@ -186,9 +190,9 @@ func (t Telegram) Start(c telebot.Context) error {
 	return c.Send(openT, markup, opts)
 }
 
-// LinkAccount handles /start link_<token>: the web account that issued the
-// token is linked to the Telegram user who sent the command. Telegram vouches
-// for the sender, so this proves ownership of the Telegram account.
+// LinkAccount handles /start link_<token>. It never links directly: it shows
+// which email is asking and waits for an explicit confirmation, so a link sent
+// by someone else cannot silently take over this Telegram account.
 func (t Telegram) LinkAccount(c telebot.Context, payload string, opts *telebot.SendOptions) error {
 	localizer := t.Localizer(c)
 	if c.Chat().Type != telebot.ChatPrivate {
@@ -198,8 +202,63 @@ func (t Telegram) LinkAccount(c telebot.Context, payload string, opts *telebot.S
 		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}), opts)
 	}
 
+	pending, err := t.Auth.InspectStartPayload(payload)
+	if err != nil {
+		if !errors.Is(err, database.ErrInvalidOrExpiredToken) && !errors.Is(err, database.ErrNoRows) {
+			log.Default().Println("failed to inspect link token:", err)
+		}
+		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}), opts)
+	}
+
+	name, isUsername := DefineUsername(c.Sender())
+	if isUsername {
+		name = "@" + name
+	}
+	question := localizer.MustLocalize(&i18n.LocalizeConfig{
+		DefaultMessage: &i18n.Message{ID: "LinkConfirmQuestion"},
+		TemplateData: map[string]string{
+			"Telegram": models.EscapeHTML(name),
+			"Email":    models.EscapeHTML(pending.Email),
+		},
+	})
+
+	markup := &telebot.ReplyMarkup{}
+	markup.InlineKeyboard = [][]telebot.InlineButton{{
+		{
+			Text:   localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkConfirmButton"}),
+			Unique: string(models.LinkConfirm),
+			Data:   pending.Token,
+		},
+		{
+			Text:   localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkCancelButton"}),
+			Unique: string(models.LinkCancel),
+			Data:   pending.Token,
+		},
+	}}
+	return c.Send(question, markup, opts)
+}
+
+// CallbackConfirmLink handles the Confirm/Cancel buttons of the link prompt.
+func (t Telegram) CallbackConfirmLink(c telebot.Context, confirm bool) error {
+	localizer := t.Localizer(c)
+	_ = c.Respond()
+
+	if c.Chat() == nil || c.Chat().Type != telebot.ChatPrivate || t.Auth == nil {
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}))
+	}
+
+	parts := strings.SplitN(c.Callback().Data, "|", 2)
+	if len(parts) != 2 {
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}))
+	}
+	token := parts[1]
+
+	if !confirm {
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkCancelled"}))
+	}
+
 	sender := c.Sender()
-	_, err := t.Auth.LinkWithStartPayload(payload, auth.TelegramUser{
+	_, err := t.Auth.ConfirmLink(token, auth.TelegramUser{
 		ID:        sender.ID,
 		FirstName: sender.FirstName,
 		LastName:  sender.LastName,
@@ -212,14 +271,14 @@ func (t Telegram) LinkAccount(c telebot.Context, payload string, opts *telebot.S
 			Text: localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkOpenAccount"}),
 			URL:  strings.TrimRight(t.Url.BaseUrl, "/") + "/account",
 		}}}
-		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkSuccess"}), markup, opts)
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkSuccess"}), markup)
 	case errors.Is(err, database.ErrTelegramAlreadyLinked):
-		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkTelegramTaken"}), opts)
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkTelegramTaken"}))
 	default:
 		if !errors.Is(err, database.ErrInvalidOrExpiredToken) {
 			log.Default().Println("failed to link account:", err)
 		}
-		return c.Send(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}), opts)
+		return c.Edit(localizer.MustLocalizeMessage(&i18n.Message{ID: "LinkFailed"}))
 	}
 }
 
