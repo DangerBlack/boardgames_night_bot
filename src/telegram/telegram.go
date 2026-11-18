@@ -61,7 +61,12 @@ func parseCreateCommand(args []string, fullText string, tz *time.Location) (name
 	}
 
 	if m := locationRegex.FindStringSubmatch(fullText); len(m) > 1 {
-		loc := strings.TrimSpace(m[1])
+		// Markers written after 📍 on the same line are options, not location.
+		loc := strings.ReplaceAll(m[1], "👥", "")
+		for _, mk := range externalMarkers {
+			loc = strings.ReplaceAll(loc, mk, "")
+		}
+		loc = strings.TrimSpace(loc)
 		location = &loc
 	}
 
@@ -341,6 +346,17 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	log.Default().Println("Full text for parsing:", fullText)
 	tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
 	eventName, location, startsAt, allowGeneralJoin := parseCreateCommand(args, fullText, tzLocation)
+	if eventName == "" {
+		// Only markers (e.g. "/create 🔗"): ask for a name instead of creating
+		// an unnamed event.
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+			DefaultMessage: &i18n.Message{ID: "Usage"},
+			TemplateData: map[string]string{
+				"Command": "/create",
+				"Example": t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "EventName"}}),
+			},
+		}))
+	}
 
 	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
 

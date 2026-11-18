@@ -237,3 +237,14 @@ func TestCreateExternalMarker(t *testing.T) {
 		t.Error("no marker must keep the event closed")
 	}
 }
+
+func TestCreateMarkersAfterLocation(t *testing.T) {
+	text := "/create Catan 📍Pub 👥🔗"
+	name, loc, _, join := parseCreateCommand(strings.Fields(strings.TrimPrefix(text, "/create ")), text, nil)
+	if name != "Catan" || loc == nil || *loc != "Pub" || !join || !wantsExternal(text) {
+		t.Fatalf("name=%q loc=%v join=%v", name, loc, join)
+	}
+	if name, _, _, _ := parseCreateCommand([]string{"🔗"}, "/create 🔗", nil); name != "" {
+		t.Fatalf("marker-only name = %q, want empty", name)
+	}
+}
