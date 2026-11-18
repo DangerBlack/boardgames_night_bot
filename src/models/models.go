@@ -53,6 +53,16 @@ type BoardGame struct {
 	BggName      *string       `json:"bgg_name"`
 	BggUrl       *string       `json:"bgg_url"`
 	BggImageUrl  *string       `json:"bgg_image_url"`
+	// ProposedByID/Name record who added the game; they are not players.
+	// Nil for games created before migration V9.
+	ProposedByID   *int64  `json:"proposed_by_id"`
+	ProposedByName *string `json:"proposed_by_name"`
+}
+
+// ProposedByExternal reports whether the game was proposed by a separated
+// (email-only) account.
+func (bg BoardGame) ProposedByExternal() bool {
+	return bg.ProposedByID != nil && IsExternalUserID(*bg.ProposedByID)
 }
 
 type CreateEventRequest struct {

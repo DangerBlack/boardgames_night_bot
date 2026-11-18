@@ -346,6 +346,7 @@ func (c *Controller) GetEvent(ctx *gin.Context) {
 		"Games":          event.BoardGames,
 		"UpdatedAt":      timeT,
 		"NoParticipants": localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
+		"ProposedBy":     localizer.MustLocalizeMessage(&i18n.Message{ID: "WebProposedBy"}),
 		"Players":        localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
 		"Join":           localizer.MustLocalizeMessage(&i18n.Message{ID: "WebJoin"}),
 		"AddGame":        localizer.MustLocalizeMessage(&i18n.Message{ID: "WebAddGame"}),
@@ -499,6 +500,7 @@ func (c *Controller) GetGame(ctx *gin.Context) {
 		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
+		"ProposedBy":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebProposedBy"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
 		"MaxPlayers":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
 		"UpdateGame":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebUpdateGame"}),
@@ -564,6 +566,7 @@ func (c *Controller) UpdateGame(ctx *gin.Context) {
 		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
+		"ProposedBy":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebProposedBy"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
 		"MaxPlayers":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
 		"UpdateGame":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebUpdateGame"}),
@@ -674,7 +677,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 	var event *models.Event
 	var game *models.BoardGame
 
-	if event, game, err = c.Service.CreateGame(eventID, nil, bg.UserID, bg.Name, bg.MaxPlayers, bg.BggUrl); err != nil {
+	if event, game, err = c.Service.CreateGame(eventID, nil, bg.UserID, proposerName(p), bg.Name, bg.MaxPlayers, bg.BggUrl); err != nil {
 		log.Default().Println("failed to add game:", err)
 		var chatID *int64
 		if event != nil {
@@ -693,6 +696,7 @@ func (c *Controller) AddGame(ctx *gin.Context) {
 		"Location":                event.Location,
 		"Game":                    game,
 		"NoParticipants":          localizer.MustLocalizeMessage(&i18n.Message{ID: "WebNoParticipants"}),
+		"ProposedBy":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebProposedBy"}),
 		"Players":                 localizer.MustLocalizeMessage(&i18n.Message{ID: "WebPlayers"}),
 		"MaxPlayers":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebMaxPlayers"}),
 		"UpdateGame":              localizer.MustLocalizeMessage(&i18n.Message{ID: "WebUpdateGame"}),
@@ -1020,7 +1024,7 @@ func (c *Controller) ListenWebhook(ctx *gin.Context) {
 		}
 
 		log.Default().Printf("Processing new game webhook: %+v", payload)
-		if _, _, err = c.Service.CreateGame(payload.EventID, &payload.ID, payload.UserID, payload.Name, &payload.MaxPlayers, payload.BGG.URL); err != nil {
+		if _, _, err = c.Service.CreateGame(payload.EventID, &payload.ID, payload.UserID, payload.UserName, payload.Name, &payload.MaxPlayers, payload.BGG.URL); err != nil {
 			log.Default().Println("failed to add game from webhook:", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add game"})
 			return
@@ -1158,4 +1162,12 @@ func Cast[T any](data any) (*T, error) {
 		return nil, err
 	}
 	return &payload, nil
+}
+
+// proposerName is how a game's proposer is shown: Telegram usernames get "@".
+func proposerName(p *auth.Principal) string {
+	if p.IsTelegramUsername {
+		return "@" + p.DisplayName
+	}
+	return p.DisplayName
 }

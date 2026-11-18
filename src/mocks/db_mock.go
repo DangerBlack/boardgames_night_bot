@@ -9,7 +9,7 @@ import (
 type MockDatabase struct {
 	InsertEventFunc                 func(id *string, chatID, userID int64, userName, name string, messageID *int64, location *string, startsAt *time.Time) (string, error)
 	InsertEventWithOptionalGameFunc func(id *string, chatID, userID int64, userName, name string, location *string, startsAt *time.Time, addPlayerCounter bool) (string, error)
-	InsertBoardGameFunc             func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	InsertBoardGameFunc             func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error)
 	UpdateBoardGameBGGInfoByIDFunc  func(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
 	UpdateEventMessageIDFunc        func(eventID string, messageID int64) error
 	DeleteBoardGameByIDFunc         func(ID string) error
@@ -60,9 +60,9 @@ func (m *MockDatabase) DeleteEvent(id string) error {
 	return nil
 }
 
-func (m *MockDatabase) InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+func (m *MockDatabase) InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 	if m.InsertBoardGameFunc != nil {
-		return m.InsertBoardGameFunc(eventID, id, name, maxPlayers, bggID, bggName, bggUrl, bggImageUrl)
+		return m.InsertBoardGameFunc(eventID, id, name, maxPlayers, bggID, bggName, bggUrl, bggImageUrl, proposedByID, proposedByName)
 	}
 	return 1, "mock-game-uuid", nil
 }

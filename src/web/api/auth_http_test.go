@@ -55,6 +55,8 @@ func newHTTPEnv(t *testing.T) *httpEnv {
 	db.MigrateToV5()
 	db.MigrateToV6()
 	db.MigrateToV7()
+	db.MigrateToV8()
+	db.MigrateToV9()
 
 	bundle := i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)

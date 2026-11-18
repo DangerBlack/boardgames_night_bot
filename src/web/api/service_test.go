@@ -179,7 +179,7 @@ func TestCreateGameLockedEventBlocksNonOwner(t *testing.T) {
 	}
 
 	nonOwnerID := int64(12345)
-	_, _, err := service.CreateGame("mock-event-id", nil, nonOwnerID, "Chess", nil, nil)
+	_, _, err := service.CreateGame("mock-event-id", nil, nonOwnerID, "Alice", "Chess", nil, nil)
 	if err == nil {
 		t.Fatal("Expected error adding game to locked event as non-owner, got nil")
 	}
@@ -207,7 +207,7 @@ func TestCreateGameLockedEventAllowsOwner(t *testing.T) {
 		return &telebot.Message{ID: 1}, nil
 	}
 
-	_, _, err := service.CreateGame("mock-event-id", nil, ownerID, "Chess", nil, nil)
+	_, _, err := service.CreateGame("mock-event-id", nil, ownerID, "Alice", "Chess", nil, nil)
 	if err != nil {
 		t.Fatalf("Expected owner to add game to their own locked event, got: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestCreateGame(t *testing.T) {
 	// telegram := service.Bot.(*mocks.MockTelegramService)
 
 	isGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 		if eventID != "mock-event-id" {
 			t.Fatalf("Expected eventID 'mock-event-id', got '%s'", eventID)
 		}
@@ -425,7 +425,7 @@ func TestCreateGame(t *testing.T) {
 	}
 
 	maxPlayer := 4
-	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Test Game", &maxPlayer, nil)
+	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Alice", "Test Game", &maxPlayer, nil)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -457,7 +457,7 @@ func TestCreateGameWithoutBGGID(t *testing.T) {
 	bggMock := service.BGG.(*mocks.MockBGGService)
 
 	isGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 		if eventID != "mock-event-id" {
 			t.Fatalf("Expected eventID 'mock-event-id', got '%s'", eventID)
 		}
@@ -468,6 +468,10 @@ func TestCreateGameWithoutBGGID(t *testing.T) {
 
 		if maxPlayers != 4 {
 			t.Fatalf("Expected maxPlayers 4, got %d", maxPlayers)
+		}
+
+		if proposedByID == nil || *proposedByID != 123456 || proposedByName == nil || *proposedByName != "Alice" {
+			t.Fatalf("Expected proposer 123456/Alice, got %v/%v", proposedByID, proposedByName)
 		}
 
 		if bggUrl == nil {
@@ -528,7 +532,7 @@ func TestCreateGameWithoutBGGID(t *testing.T) {
 
 	maxPlayer := 4
 	bggUrl := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d/azul", bggID)
-	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Test Game", &maxPlayer, &bggUrl)
+	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Alice", "Test Game", &maxPlayer, &bggUrl)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -553,7 +557,7 @@ func TestCreateGameRespectMaxPlayer(t *testing.T) {
 
 	requestedMaxPlayer := 8
 	isGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 		if maxPlayers != requestedMaxPlayer {
 			t.Fatalf("Expected maxPlayers %d, got %d", requestedMaxPlayer, maxPlayers)
 		}
@@ -607,7 +611,7 @@ func TestCreateGameRespectMaxPlayer(t *testing.T) {
 	}
 
 	bggUrl := fmt.Sprintf("https://boardgamegeek.com/boardgame/%d/azul", bggID)
-	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Test Game", &requestedMaxPlayer, &bggUrl)
+	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Alice", "Test Game", &requestedMaxPlayer, &bggUrl)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -632,7 +636,7 @@ func TestCreateGameRespectMaxPlayerNoUrl(t *testing.T) {
 
 	requestedMaxPlayer := 8
 	isGameInserted := false
-	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+	db.InsertBoardGameFunc = func(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 		if maxPlayers != requestedMaxPlayer {
 			t.Fatalf("Expected maxPlayers %d, got %d", requestedMaxPlayer, maxPlayers)
 		}
@@ -694,7 +698,7 @@ func TestCreateGameRespectMaxPlayerNoUrl(t *testing.T) {
 		}, nil
 	}
 
-	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Test Game", &requestedMaxPlayer, nil)
+	_, bg, err := service.CreateGame("mock-event-id", nil, 123456, "Alice", "Test Game", &requestedMaxPlayer, nil)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

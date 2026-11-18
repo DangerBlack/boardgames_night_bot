@@ -38,6 +38,7 @@
             max-width: 200px;
         }
         .game-info .blurred-image { filter: blur(2px); }
+        .proposer { color: #777; font-size: 0.9em; font-style: italic; margin: 2px 0; }
         .participants { 
             margin-left: 20px; 
             font-style: italic; 
@@ -156,6 +157,9 @@
             {{ end }}
             {{ if .Game.BggUrl }}
             <p><a href="{{ .Game.BggUrl }}" target="_blank">🔗{{ .Game.BggName }}</a></p>
+            {{ end }}
+            {{ if .Game.ProposedByName }}
+            <p class="proposer">💡 {{ .ProposedBy }} {{ .Game.ProposedByName }}{{ if .Game.ProposedByExternal }} ✉️{{ end }}</p>
             {{ end }}
             <p><strong>{{ .MaxPlayers }}:</strong> {{ .Game.MaxPlayers }}</p>
             <p><strong class="capitalize">{{ .Players }}:</strong></p>

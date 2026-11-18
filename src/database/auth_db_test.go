@@ -41,6 +41,7 @@ func TestMigrateToV7KeepsExistingDataAndIsIdempotent(t *testing.T) {
 
 	d.MigrateToV7()
 	d.MigrateToV7() // boot twice: must be a no-op
+	d.MigrateToV9() // event selects read the V9 columns
 
 	ev, err := d.SelectEventByEventID(eventID)
 	if err != nil {
@@ -67,6 +68,8 @@ func TestMigrateToV7KeepsExistingDataAndIsIdempotent(t *testing.T) {
 func newV7DB(t *testing.T) *Database {
 	d := newMigratedDB(t)
 	d.MigrateToV7()
+	d.MigrateToV8()
+	d.MigrateToV9()
 	return d
 }
 
@@ -282,5 +285,72 @@ func TestMigrateToV8KeepsValidRows(t *testing.T) {
 	d.db.QueryRow(`SELECT COUNT(*) FROM participants`).Scan(&p)
 	if g != 1 || p != 1 {
 		t.Fatalf("V8 removed valid rows: games=%d participants=%d", g, p)
+	}
+}
+
+func TestGameProposer(t *testing.T) {
+	d := newMigratedDB(t)
+	// A game created before V9 has no proposer.
+	evOld, _ := d.InsertEventWithOptionalGame(nil, 1, 1, "owner", "old", nil, nil, true)
+	d.MigrateToV7()
+	d.MigrateToV8()
+	d.MigrateToV9()
+	d.MigrateToV9() // idempotent
+
+	ev, err := d.SelectEventByEventID(evOld)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bg := ev.BoardGames[0]; bg.ProposedByID != nil || bg.ProposedByName != nil {
+		t.Fatalf("pre-V9 game must have no proposer: %+v", bg)
+	}
+
+	// A separated account proposes a game it does not play.
+	u, _ := d.GetOrCreateUserByEmail("frank@example.com")
+	d.SetSeparatedUsername(u.ID, "frank")
+	ext := models.ExternalUserID(u.ID)
+	name := "frank"
+	evID, _ := d.InsertEventWithOptionalGame(nil, 1, 1, "owner", "new", nil, nil, true)
+	if _, _, err = d.InsertBoardGame(evID, nil, "Catan", 4, nil, nil, nil, nil, &ext, &name); err != nil {
+		t.Fatal(err)
+	}
+	proposed := func() models.BoardGame {
+		ev, err := d.SelectEventByEventID(evID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range ev.BoardGames {
+			if g.Name == "Catan" {
+				return g
+			}
+		}
+		t.Fatal("game not found")
+		return models.BoardGame{}
+	}
+	if g := proposed(); g.ProposedByID == nil || *g.ProposedByID != ext || *g.ProposedByName != "frank" || !g.ProposedByExternal() || len(g.Participants) != 0 {
+		t.Fatalf("proposer not stored apart from players: %+v", g)
+	}
+
+	// Linking Telegram moves the proposer too.
+	if _, err = d.LinkTelegram(u.ID, 555, "frank_tg", true); err != nil {
+		t.Fatal(err)
+	}
+	if g := proposed(); *g.ProposedByID != 555 || *g.ProposedByName != "frank_tg" || g.ProposedByExternal() {
+		t.Fatalf("proposer not moved on link: %+v", g)
+	}
+
+	// Deleting a separated account forgets its name on proposed games.
+	v, _ := d.GetOrCreateUserByEmail("gina@example.com")
+	d.SetSeparatedUsername(v.ID, "gina")
+	gext, gname := models.ExternalUserID(v.ID), "gina"
+	d.InsertBoardGame(evID, nil, "Azul", 4, nil, nil, nil, nil, &gext, &gname)
+	if _, err = d.DeleteUser(v.ID); err != nil {
+		t.Fatal(err)
+	}
+	ev, _ = d.SelectEventByEventID(evID)
+	for _, g := range ev.BoardGames {
+		if g.Name == "Azul" && (g.ProposedByID != nil || g.ProposedByName != nil) {
+			t.Fatalf("deleted account still shown as proposer: %+v", g)
+		}
 	}
 }

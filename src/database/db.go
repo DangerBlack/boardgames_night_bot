@@ -27,7 +27,7 @@ type DatabaseService interface {
 	SelectEvent(chatID int64) (*models.Event, error)
 	SelectEventByEventID(eventID string) (*models.Event, error)
 	DeleteEvent(id string) error
-	InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error)
+	InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error)
 	UpdateEventMessageID(eventID string, messageID int64) error
 	UpdateBoardGameBGGInfoByID(ID int64, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) error
 	DeleteBoardGameByID(ID string) error
@@ -450,6 +450,8 @@ func (d *Database) SelectEvent(chatID int64) (*models.Event, error) {
 	b.bgg_name,
 	b.bgg_url,
 	b.bgg_image_url,
+	b.proposed_by_id,
+	b.proposed_by_name,
 	p.id,
 	p.uuid,
 	p.user_id,
@@ -484,6 +486,8 @@ func (d *Database) SelectEventByEventID(eventID string) (*models.Event, error) {
 	b.bgg_name,
 	b.bgg_url,
 	b.bgg_image_url,
+	b.proposed_by_id,
+	b.proposed_by_name,
 	p.id,
 	p.uuid,
 	p.user_id,
@@ -512,8 +516,8 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 		var boardGame models.BoardGame
 		var participant models.Participant
 
-		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID pgtype.Int8
-		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location pgtype.Text
+		var eventMessageID, boardGameID, boardGameMaxPlayers, participantID, participantUserID, bggID, bgMessageID, proposedByID pgtype.Int8
+		var boardGameUUID, participantUUID, boardGameName, participantUserName, bggName, bggUrl, bggImageUrl, location, proposedByName pgtype.Text
 		var startsAt, participantCreatedAt pgtype.Timestamp
 		var isTelegramUsername, allowExternal pgtype.Bool
 
@@ -536,6 +540,8 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 			&bggName,
 			&bggUrl,
 			&bggImageUrl,
+			&proposedByID,
+			&proposedByName,
 			&participantID,
 			&participantUUID,
 			&participantUserID,
@@ -554,15 +560,17 @@ func (d *Database) selectEventByQuery(query string, args map[string]any) (*model
 
 		if IntOrNil(boardGameID) != nil {
 			boardGame = models.BoardGame{
-				ID:          *IntOrNil(boardGameID),
-				UUID:        *StringOrNil(boardGameUUID),
-				Name:        *StringOrNil(boardGameName),
-				MaxPlayers:  *IntOrNil(boardGameMaxPlayers),
-				MessageID:   IntOrNil(bgMessageID),
-				BggID:       IntOrNil(bggID),
-				BggName:     StringOrNil(bggName),
-				BggUrl:      StringOrNil(bggUrl),
-				BggImageUrl: StringOrNil(bggImageUrl),
+				ID:             *IntOrNil(boardGameID),
+				UUID:           *StringOrNil(boardGameUUID),
+				Name:           *StringOrNil(boardGameName),
+				MaxPlayers:     *IntOrNil(boardGameMaxPlayers),
+				MessageID:      IntOrNil(bgMessageID),
+				BggID:          IntOrNil(bggID),
+				BggName:        StringOrNil(bggName),
+				BggUrl:         StringOrNil(bggUrl),
+				BggImageUrl:    StringOrNil(bggImageUrl),
+				ProposedByID:   IntOrNil(proposedByID),
+				ProposedByName: StringOrNil(proposedByName),
 			}
 
 			if _, ok := boardGameMap[boardGame.ID]; !ok {
@@ -674,14 +682,14 @@ func (d *Database) UpdateEventMessageID(eventID string, messageID int64) error {
 	return nil
 }
 
-func (d *Database) InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string) (int64, string, error) {
+func (d *Database) InsertBoardGame(eventID string, id *string, name string, maxPlayers int, bggID *int64, bggName, bggUrl, bggImageUrl *string, proposedByID *int64, proposedByName *string) (int64, string, error) {
 	var boardGameID int64
 	if id == nil {
 		pId := uuid.New().String()
 		id = &pId
 	}
 
-	query := `INSERT INTO boardgames (event_id, uuid, name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url) VALUES (@event_id, @uuid, @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url) RETURNING id,uuid;`
+	query := `INSERT INTO boardgames (event_id, uuid, name, max_players, bgg_id, bgg_name, bgg_url, bgg_image_url, proposed_by_id, proposed_by_name) VALUES (@event_id, @uuid, @name, @max_players, @bgg_id, @bgg_name, @bgg_url, @bgg_image_url, @proposed_by_id, @proposed_by_name) RETURNING id,uuid;`
 
 	if bggImageUrl != nil && *bggImageUrl == "" {
 		// Fix for BGG image URLs that contains a filter with mandatory (png)
@@ -693,14 +701,16 @@ func (d *Database) InsertBoardGame(eventID string, id *string, name string, maxP
 
 	if err := d.db.QueryRow(query,
 		NamedArgs(map[string]any{
-			"event_id":      eventID,
-			"uuid":          id,
-			"name":          name,
-			"max_players":   maxPlayers,
-			"bgg_id":        bggID,
-			"bgg_url":       bggUrl,
-			"bgg_name":      bggName,
-			"bgg_image_url": bggImageUrl,
+			"event_id":         eventID,
+			"uuid":             id,
+			"name":             name,
+			"max_players":      maxPlayers,
+			"bgg_id":           bggID,
+			"bgg_url":          bggUrl,
+			"bgg_name":         bggName,
+			"bgg_image_url":    bggImageUrl,
+			"proposed_by_id":   proposedByID,
+			"proposed_by_name": proposedByName,
 		})...,
 	).Scan(&boardGameID, id); err != nil {
 		return 0, "", err
