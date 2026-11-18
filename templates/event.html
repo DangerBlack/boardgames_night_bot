@@ -55,6 +55,7 @@
             margin: 5px 0;
         }
 
+        .proposer { color: #777; font-size: 0.9em; font-style: italic; margin: 2px 0; }
         .participants {
             margin-left: 20px;
             font-style: italic;
@@ -285,6 +286,9 @@
                     {{ end }}
                     )
                 </p>
+                {{ if .ProposedByName }}
+                <p class="proposer">💡 {{ $.ProposedBy }} {{ .ProposedByName }}{{ if .ProposedByExternal }} {{ $.ExternalMarker }}{{ end }}</p>
+                {{ end }}
                 <div class="participants">
                     {{ if .Participants }}
                     {{ $game := . }}

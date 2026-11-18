@@ -225,6 +225,7 @@ func (s *Service) CreateGame(
 	eventID string,
 	id *string,
 	userID int64,
+	userName string,
 	name string,
 	maxPlayers *int,
 	bggUrl *string,
@@ -258,7 +259,11 @@ func (s *Service) CreateGame(
 
 	log.Default().Printf("Inserting %s in the db", name)
 
-	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, finalMaxPlayers, bgID, bgInfo.Name, bgInfo.Url, bgInfo.ImageUrl); err != nil {
+	var proposedByName *string
+	if userName != "" {
+		proposedByName = &userName
+	}
+	if _, _, err = s.DB.InsertBoardGame(event.ID, id, name, finalMaxPlayers, bgID, bgInfo.Name, bgInfo.Url, bgInfo.ImageUrl, &userID, proposedByName); err != nil {
 		log.Default().Println("failed to insert board game:", err)
 		return nil, nil, fmt.Errorf("failed to insert board game: %w", err)
 	}

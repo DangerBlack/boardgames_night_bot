@@ -26,15 +26,17 @@ func TestTemplatesRender(t *testing.T) {
 		{UserID: 5, UserName: "tg_user"},
 		{UserID: -3, UserName: "Web Person"},
 	}}}
+	proposerID, proposerName := int64(-9), "Ann"
+	games[0].ProposedByID, games[0].ProposedByName = &proposerID, &proposerName
 
 	cases := []struct {
 		name string
 		data map[string]any
 		want []string
 	}{
-		{"event", map[string]any{"Id": "e1", "Title": `Night "1"`, "Games": games, "ShareURL": "https://x/events/e1", "MiniAppURL": "https://t.me/b/app?startapp=e1", "ExternalMarker": "✉️", "T": T, "QueuedLang": "en"},
-			[]string{"https://x/events/e1", "Web Person ✉️", "tg-init-data"}},
-		{"game_info", map[string]any{"Id": "e1", "Game": games[0]}, []string{"Web Person ✉️", "tg-init-data"}},
+		{"event", map[string]any{"Id": "e1", "Title": `Night "1"`, "Games": games, "ShareURL": "https://x/events/e1", "MiniAppURL": "https://t.me/b/app?startapp=e1", "ExternalMarker": "✉️", "T": T, "QueuedLang": "en", "ProposedBy": "Proposed by"},
+			[]string{"https://x/events/e1", "Web Person ✉️", "tg-init-data", "Proposed by Ann ✉️"}},
+		{"game_info", map[string]any{"Id": "e1", "Game": games[0], "ProposedBy": "Proposed by"}, []string{"Web Person ✉️", "tg-init-data", "Proposed by Ann ✉️"}},
 		{"new_event", map[string]any{"ChatID": "1", "AllowExternal": "allow"}, []string{`name="allow_external"`, "tgInitData"}},
 		{"login", map[string]any{"Next": "/events/e1", "EmailEnabled": true, "T": T}, []string{`value="/events/e1"`}},
 		{"verify", map[string]any{"Token": "abc", "Email": "victim@example.com", "Next": "/account", "T": T}, []string{`value="abc"`, "victim@example.com"}},

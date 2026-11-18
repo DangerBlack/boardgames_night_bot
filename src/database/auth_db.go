@@ -70,6 +70,20 @@ func (d *Database) MigrateToV7() {
 	log.Default().Println("database migration to v7 completed")
 }
 
+// MigrateToV9 records who proposed each game, kept apart from its players.
+// Additive only: existing games get NULL (proposer unknown).
+func (d *Database) MigrateToV9() {
+	for _, col := range []struct{ name, typ string }{
+		{"proposed_by_id", "INTEGER"},
+		{"proposed_by_name", "TEXT"},
+	} {
+		if _, err := d.addColumnIfNotExists("boardgames", col.name, col.typ); err != nil {
+			log.Fatal("MigrateToV9: ", err)
+		}
+	}
+	log.Default().Println("database migration to v9 completed")
+}
+
 // MigrateToV8 removes rows orphaned while foreign keys were not enforced
 // (games and participants of deleted events, participants of deleted games).
 // It runs before anything relies on cascades and is idempotent.
@@ -343,6 +357,8 @@ func (d *Database) LinkTelegram(userID, telegramUserID int64, telegramName strin
 			[]any{telegramUserID, telegramName, isTelegramUsername, externalID}},
 		{`UPDATE events SET user_id = ?, user_name = ? WHERE user_id = ?;`,
 			[]any{telegramUserID, telegramName, externalID}},
+		{`UPDATE boardgames SET proposed_by_id = ?, proposed_by_name = ? WHERE proposed_by_id = ?;`,
+			[]any{telegramUserID, telegramName, externalID}},
 		{`UPDATE users SET telegram_user_id = ?, telegram_name = ?, telegram_is_username = ?, is_separated = 0 WHERE id = ?;`,
 			[]any{telegramUserID, telegramName, isTelegramUsername, userID}},
 	}
@@ -401,6 +417,7 @@ func (d *Database) DeleteUser(userID int64) ([]string, error) {
 		args []any
 	}{
 		{`DELETE FROM participants WHERE user_id = ?;`, []any{externalID}},
+		{`UPDATE boardgames SET proposed_by_id = NULL, proposed_by_name = NULL WHERE proposed_by_id = ?;`, []any{externalID}},
 		{`DELETE FROM sessions WHERE user_id = ?;`, []any{userID}},
 		{`DELETE FROM auth_tokens WHERE user_id = ? OR (email IS NOT NULL AND email = ?);`, []any{userID, email}},
 		{`DELETE FROM users WHERE id = ?;`, []any{userID}},

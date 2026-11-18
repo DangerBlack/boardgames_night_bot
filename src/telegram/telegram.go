@@ -401,7 +401,11 @@ func (t Telegram) AddGame(c telebot.Context) error {
 
 	chatID := c.Chat().ID
 	userID := c.Sender().ID
-	userName, _ := DefineUsername(c.Sender())
+	userName, isUsername := DefineUsername(c.Sender())
+	proposer := userName
+	if isUsername {
+		proposer = "@" + userName
+	}
 	gameName := strings.Join(args[0:], " ")
 	log.Default().Printf("Adding game: %s in chat id %d", gameName, chatID)
 
@@ -419,7 +423,7 @@ func (t Telegram) AddGame(c telebot.Context) error {
 	}
 
 	var game *models.BoardGame
-	if event, game, err = t.Service.CreateGame(event.ID, nil, userID, gameName, nil, nil); err != nil {
+	if event, game, err = t.Service.CreateGame(event.ID, nil, userID, proposer, gameName, nil, nil); err != nil {
 		log.Default().Println("failed to add game:", err)
 		failedT := t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "FailedToAddGame"}})
 		return c.Reply(failedT)
