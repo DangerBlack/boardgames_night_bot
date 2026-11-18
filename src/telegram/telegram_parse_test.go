@@ -223,7 +223,7 @@ func TestParseCreateCommandNameDoesNotContainMetadata(t *testing.T) {
 }
 
 func TestCreateExternalMarker(t *testing.T) {
-	for _, text := range []string{"/create Night ⛓", "/create Night ⛓️", "/create 🔗 Night", "/create Night 👥⛓\n📍Bar"} {
+	for _, text := range []string{"/create Night 🔗", "/create 🔗 Night", "/create Night 👥🔗\n📍Bar"} {
 		args := strings.Fields(strings.TrimPrefix(text, "/create "))
 		if !wantsExternal(text) {
 			t.Errorf("%q: marker not detected", text)

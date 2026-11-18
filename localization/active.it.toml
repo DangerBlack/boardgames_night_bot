@@ -8,7 +8,7 @@ Utilizzo:
     🔒 Rendi l'evento modificabile solo da te
     📍 Definisci la location dell'evento
     👥 Aggiungi un bottone per permettere agli utenti di partecipare senza scegliere un gioco
-    ⛓ Permetti a chi non usa Telegram di partecipare tramite il link dell'evento
+    🔗 Permetti a chi non usa Telegram di partecipare tramite il link dell'evento
     🕒 Specifica l'orario dell'evento formattato come YYYY-MM-DD HH:MM (es. 2023-12-31 20:30)
 - Usa /add_game [nome gioco] per aggiungere giochi all'evento.
 - Rispondi al messaggio dell'evento con /external on|off per far partecipare chi non usa Telegram (solo il creatore).

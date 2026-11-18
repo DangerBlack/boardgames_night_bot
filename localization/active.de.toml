@@ -8,7 +8,7 @@ Verwendung:
     🔒 Das Event nur von dir bearbeitbar machen
     📍 Den Veranstaltungsort festlegen
     👥 Einen Button hinzufügen, der es Nutzern erlaubt teilzunehmen, ohne ein bestimmtes Spiel auszuwählen
-    ⛓ Personen ohne Telegram über den Event-Link teilnehmen lassen
+    🔗 Personen ohne Telegram über den Event-Link teilnehmen lassen
     🕒 Die Veranstaltungszeit im Format JJJJ-MM-TT HH:MM angeben (z.B. 2023-12-31 20:30)
 - Nutze /add_game [Spielname], um Spiele zum Event hinzuzufügen.
 - Antworte auf die Event-Nachricht mit /external on|off, um Personen ohne Telegram teilnehmen zu lassen (nur Ersteller).

@@ -70,8 +70,8 @@ func parseCreateCommand(args []string, fullText string, tz *time.Location) (name
 }
 
 // externalMarkers in a /create message open the event to people outside
-// Telegram. The variation selector is listed first so "⛓️" is fully removed.
-var externalMarkers = []string{"⛓️", "⛓", "🔗"}
+// Telegram.
+var externalMarkers = []string{"🔗"}
 
 func wantsExternal(fullText string) bool {
 	for _, m := range externalMarkers {
