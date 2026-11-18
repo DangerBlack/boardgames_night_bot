@@ -354,3 +354,18 @@ func TestGameProposer(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectEventIDByMessage(t *testing.T) {
+	d := newV7DB(t)
+	id, _ := d.InsertEventWithOptionalGame(nil, 10, 1, "o", "x", nil, nil, false)
+	if err := d.UpdateEventMessageID(id, 99); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := d.SelectEventIDByMessage(10, 99); err != nil || got != id {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	// Same message ID in another chat must not match.
+	if _, err := d.SelectEventIDByMessage(11, 99); !errors.Is(err, ErrNoRows) {
+		t.Fatalf("expected ErrNoRows, got %v", err)
+	}
+}

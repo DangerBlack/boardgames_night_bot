@@ -39,6 +39,9 @@ func parseCreateCommand(args []string, fullText string, tz *time.Location) (name
 	name = locationRegex.ReplaceAllString(raw, "")
 	name = dateTimeRegex.ReplaceAllString(name, "")
 	name = strings.ReplaceAll(name, "👥", "")
+	for _, m := range externalMarkers {
+		name = strings.ReplaceAll(name, m, "")
+	}
 	name = strings.TrimSpace(name)
 
 	if dateTimeStr := dateTimeRegex.FindString(fullText); dateTimeStr != "" {
@@ -58,12 +61,30 @@ func parseCreateCommand(args []string, fullText string, tz *time.Location) (name
 	}
 
 	if m := locationRegex.FindStringSubmatch(fullText); len(m) > 1 {
-		loc := strings.TrimSpace(m[1])
+		// Markers written after 📍 on the same line are options, not location.
+		loc := strings.ReplaceAll(m[1], "👥", "")
+		for _, mk := range externalMarkers {
+			loc = strings.ReplaceAll(loc, mk, "")
+		}
+		loc = strings.TrimSpace(loc)
 		location = &loc
 	}
 
 	allowGeneralJoin = strings.Contains(fullText, "👥")
 	return
+}
+
+// externalMarkers in a /create message open the event to people outside
+// Telegram.
+var externalMarkers = []string{"🔗"}
+
+func wantsExternal(fullText string) bool {
+	for _, m := range externalMarkers {
+		if strings.Contains(fullText, m) {
+			return true
+		}
+	}
+	return false
 }
 
 type Telegram struct {
@@ -87,6 +108,7 @@ func (t Telegram) SetupHandlers() {
 	t.Bot.Handle("/timezone", t.SetDefaultTimezone)
 	t.Bot.Handle("/register", t.RegisterWebhook)
 	t.Bot.Handle("/test", t.TestWebhook)
+	t.Bot.Handle("/external", t.SetExternal)
 
 	t.Bot.Handle(telebot.OnText, func(c telebot.Context) error {
 		if c.Message().ReplyTo == nil {
@@ -324,6 +346,17 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	log.Default().Println("Full text for parsing:", fullText)
 	tzLocation := t.DB.GetDefaultTimezoneLocation(chatID)
 	eventName, location, startsAt, allowGeneralJoin := parseCreateCommand(args, fullText, tzLocation)
+	if eventName == "" {
+		// Only markers (e.g. "/create 🔗"): ask for a name instead of creating
+		// an unnamed event.
+		return c.Reply(t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{
+			DefaultMessage: &i18n.Message{ID: "Usage"},
+			TemplateData: map[string]string{
+				"Command": "/create",
+				"Example": t.Localizer(c).MustLocalize(&i18n.LocalizeConfig{DefaultMessage: &i18n.Message{ID: "EventName"}}),
+			},
+		}))
+	}
 
 	log.Default().Printf("Creating event: %s by user: %s (%d) in chat: %d", eventName, userName, userID, chatID)
 
@@ -335,6 +368,14 @@ func (t Telegram) CreateGame(c telebot.Context) error {
 	}
 
 	log.Default().Printf("Event created with id: %s", event.ID)
+
+	if wantsExternal(fullText) {
+		if updated, err := t.Service.SetAllowExternal(event.ID, userID, true); err != nil {
+			log.Default().Println("failed to allow external users:", err)
+		} else {
+			event = updated
+		}
+	}
 
 	t.Hook.SendAllWebhookAsync(context.Background(), event.ChatID, models.HookWebhookEnvelope{
 		Type: models.HookWebhookTypeNewEvent,
@@ -1044,4 +1085,47 @@ func (t Telegram) CallbackUnregisterWebhook(c telebot.Context) error {
 	}
 
 	return nil
+}
+
+// SetExternal handles "/external on|off" sent as a reply to an event message.
+// Only the event owner may change it.
+func (t Telegram) SetExternal(c telebot.Context) error {
+	localizer := t.Localizer(c)
+	reply := func(id string) error {
+		return c.Reply(localizer.MustLocalizeMessage(&i18n.Message{ID: id}))
+	}
+
+	args := c.Args()
+	if c.Message().ReplyTo == nil || len(args) != 1 {
+		return reply("ExternalUsage")
+	}
+	var allow bool
+	switch strings.ToLower(args[0]) {
+	case "on":
+		allow = true
+	case "off":
+		allow = false
+	default:
+		return reply("ExternalUsage")
+	}
+
+	eventID, err := t.DB.SelectEventIDByMessage(c.Chat().ID, int64(c.Message().ReplyTo.ID))
+	if err != nil {
+		if !errors.Is(err, database.ErrNoRows) {
+			log.Default().Println("failed to find event by message:", err)
+		}
+		return reply("ExternalNotEventMessage")
+	}
+
+	if _, err = t.Service.SetAllowExternal(eventID, c.Sender().ID, allow); err != nil {
+		if errors.Is(err, api.ErrNotEventOwner) {
+			return reply("ExternalOnlyOwner")
+		}
+		log.Default().Println("failed to set allow external:", err)
+		return reply("FailedToUpdateMessageEvent")
+	}
+	if allow {
+		return reply("ExternalEnabled")
+	}
+	return reply("ExternalDisabled")
 }

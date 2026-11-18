@@ -470,3 +470,14 @@ func prefixed(prefix, cols string) string {
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
+
+// SelectEventIDByMessage returns the event whose Telegram message is messageID
+// in chatID. Used by commands sent as a reply to the event message.
+func (d *Database) SelectEventIDByMessage(chatID, messageID int64) (string, error) {
+	var id string
+	err := d.db.QueryRow(`SELECT id FROM events WHERE chat_id = ? AND message_id = ?;`, chatID, messageID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoRows
+	}
+	return id, err
+}

@@ -8,8 +8,10 @@ How to use:
     🔒 Make the event editable only by you
     📍 Set the event location
     👥 Add a button that allows users to participate without choosing a specific game
+    🔗 Let people outside Telegram join through the event link
     🕒 Specify the event time formatted as YYYY-MM-DD HH:MM (e.g., 2023-12-31 20:30)
 - Use /add_game [game name] to add games to the event.
+- Reply to the event message with /external on|off to let people outside Telegram join (owner only).
 - Use /language [lan] to set the bot language (en/it/de).
 - Use /location [location] to set or update the default location for the chat.
 - Use /timezone [timezone] to set or update the default timezone for the chat (e.g., Europe/Rome).
@@ -179,3 +181,8 @@ WebNotYourEmail = "If this is not your email, close this page: someone may be tr
 WebLinkConfirm = "Link this Telegram account to the account below? It will be able to act as you."
 EventLink = "Event link"
 WebProposedBy = "Proposed by"
+ExternalUsage = "Reply to the event message with /external on or /external off."
+ExternalNotEventMessage = "Reply to the event message (the one with the games list)."
+ExternalOnlyOwner = "Only the event owner can change this."
+ExternalEnabled = "🔗 People outside Telegram can now join this event through its link."
+ExternalDisabled = "🔒 Only Telegram users can join this event now."

@@ -221,3 +221,30 @@ func TestParseCreateCommandNameDoesNotContainMetadata(t *testing.T) {
 		t.Errorf("name contains date: %q", name)
 	}
 }
+
+func TestCreateExternalMarker(t *testing.T) {
+	for _, text := range []string{"/create Night 🔗", "/create 🔗 Night", "/create Night 👥🔗\n📍Bar"} {
+		args := strings.Fields(strings.TrimPrefix(text, "/create "))
+		if !wantsExternal(text) {
+			t.Errorf("%q: marker not detected", text)
+		}
+		name, _, _, _ := parseCreateCommand(args, text, nil)
+		if name != "Night" {
+			t.Errorf("%q: name = %q, want Night", text, name)
+		}
+	}
+	if wantsExternal("/create Night 👥") {
+		t.Error("no marker must keep the event closed")
+	}
+}
+
+func TestCreateMarkersAfterLocation(t *testing.T) {
+	text := "/create Catan 📍Pub 👥🔗"
+	name, loc, _, join := parseCreateCommand(strings.Fields(strings.TrimPrefix(text, "/create ")), text, nil)
+	if name != "Catan" || loc == nil || *loc != "Pub" || !join || !wantsExternal(text) {
+		t.Fatalf("name=%q loc=%v join=%v", name, loc, join)
+	}
+	if name, _, _, _ := parseCreateCommand([]string{"🔗"}, "/create 🔗", nil); name != "" {
+		t.Fatalf("marker-only name = %q, want empty", name)
+	}
+}
